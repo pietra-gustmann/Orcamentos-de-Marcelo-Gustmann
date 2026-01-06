@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casa</title>
+    <style>
+        li{
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<form action="{{ url_for('cadastro_novo_prod') }}" 
+      method="POST" 
+      enctype="multipart/form-data">
+
+    <label for="id">Código:</label>
+    <input type="text" id="id" name="id" required><br><br>
+
+    <label for="nome">Nome completo:</label>
+    <input type="text" id="nome" name="nome" required><br><br>
+
+    <label for="imagem">Foto do produto</label>
+    <input type="file" id="imagem" name="imagem" required><br><br>
+
+    <button type="submit">Cadastrar</button>
+</form>
+
+<br><br>
+ <a href="{{url_for('home')}}">Voltar à inicial</a><br>
+
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casa</title>
+    <style>
+        li{
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Cadastrar um novo Orçamento</h1><br><br>
+
+<form action="{{ url_for('cadastrar_orc') }}" method="POST">
+
+    {% if not session.get("cliente") %}
+        <label>Nome do cliente:</label>
+        <input type="text" name="cliente" required><br><br>
+
+        <label>Cidade:</label>
+        <input type="text" name="cidade" required><br><br>
+
+    {% else %}
+        <p><strong>Cliente:</strong> {{ session["cliente"] }}</p>
+        <p><strong>Cidade:</strong> {{ session["cidade"] }}</p>
+        <hr>
+    {% endif %}
+    
+    <hr><br>
+
+    <label>Produto:</label><br>
+    <select name="id_produto" required>
+        <option value="">-- Selecione um produto --</option>
+
+        {% for produto in produtos %}
+            <option value="{{ produto.id }}">
+                {{ produto.id }}
+            </option>
+        {% endfor %}
+    </select>
+    <br><br>
+
+
+    <label>Quantidade:</label>
+    <input type="number" name="quantidade" required><br><br>
+
+    <label>Cor:</label>
+    <input type="text" name="cor" required><br><br>
+
+    <label>Medida (L x A):</label>
+    <input type="text" name="medida" required><br><br>
+
+    <label>Tipo de vidro:</label>
+    <input type="text" name="vidro" required><br><br>
+
+    <label>Valor unitário (Informe com ponto entre os reais e centavos invés de vírgula):</label>
+    <input type="text" name="unitario" required><br><br>
+
+    <label>Local de aplicação:</label>
+    <input type="text" name="local"><br><br>
+
+    <!-- 🔹 BOTÕES DIFERENTES, MESMO FORM -->
+    <button type="submit" name="acao" value="adicionar">
+        ➕ Adicionar produto
+    </button><br><br>
+
+    <button type="submit" name="acao" value="salvar">
+        📄 Salvar
+    </button>
+
+</form>
+
+<br><br>
+ <a href="{{url_for('home')}}">Voltar à inicial</a><br>
+
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastrados</title>
+    <style>
+        li{
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Orçamentos Cadastrados</h1>
+
+{% if orcamentos %}
+    <ul>
+        {% for orcamento in orcamentos %}
+            <li>
+                <strong>ID:</strong> {{ orcamento.id_orcamento }} <br>
+                <strong>Nome do Cliente:</strong> {{ orcamento.cliente }} <br>
+                <strong>Cidade:</strong> {{ orcamento.cidade }} <br>
+
+                    <a style="border: solid, 2px, black; padding: 2px; text-decoration: none; font-size: 19.8px;" href="{{ url_for('editar_orcamento', id_orcamento=orcamento.id_orcamento) }}">
+                        ✏️ Editar orçamento
+                    </a> 
+                
+                <form action="{{ url_for('excluir_orcamento', id_orcamento=orcamento.id_orcamento) }}" 
+                    method="POST"
+                    onsubmit="return confirm('Tem certeza que deseja excluir este produto?');">
+
+                     <button type="submit" style="color: red;font-size: 16.7px; background-color: white;">
+                        🗑️ Excluir orcamento
+                    </button>
+                </form> 
+                <a style="border: solid, 2px, black; padding: 2px; text-decoration: none; font-size: 17.1px;" href="{{ url_for('finalizar_orcamento', id_orcamento=orcamento.id_orcamento) }}">
+                        ✅ Finalizar Orçamento
+                    </a> <br>
+                <hr>
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+<br><br>
+<a href="{{url_for('home')}}">Voltar à inicial</a><br>
+</body>
+</html>

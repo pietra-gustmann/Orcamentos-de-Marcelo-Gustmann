@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finalizar Orçamento</title>
+    <style>
+        label{
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Finalizar o Orçamento para Fechar Pedido</h1>
+<br><br>
+
+<form method="POST"
+      action="{{ url_for('finalizar_orcamento', id_orcamento=orcamento.id_orcamento) }}">
+
+    <label>Cliente:</label>
+    <input type="text" name="cliente" value="{{ orcamento.cliente }}" required>
+
+    <br><br>
+
+    <label>CPF/CNPJ:</label><br>
+    <input type="text" name="cpf"><br><br>
+
+    <label>Endereço:</label><br>
+    <input type="text" name="endereco"><br><br>
+
+    <label>Bairro:</label><br>
+    <input type="text" name="bairro"><br><br>
+
+    <label>CEP:</label><br>
+    <input type="text" name="cep"><br><br>
+
+    <label>Telefone:</label><br>
+    <input type="text" name="telefone"><br><br>
+
+    <label>Data:</label><br>
+    <input type="text" name="data"><br><br>
+
+    <label>Informação extra / negociação:</label><br>
+    <input 
+        type="text" 
+        name="negociado" 
+        placeholder="Ex: pagamento à vista, em quantas vezes..."
+        style="width: 600px; height: 40px;"
+    >
+    <br>
+    <label>Entrada:</label><br>
+    <input type="text" name="entrada">
+    <br>
+
+    <label>Próximas parcelas das Condições de pagamento:</label><br>
+    <textarea name="condicoes" rows="4" cols="60">
+    </textarea><br>
+
+    <label>Prazo de entrega: (apenas o tempo, em dias, semanas, meses etc)</label><br>
+    <input type="text" name="prazo">
+    <br>
+
+
+    <br>
+
+    <button type="submit">
+        📄 Gerar PDF completo
+    </button>
+</form>
+
+<br><br>
+
+<a href="{{ url_for('home') }}">Voltar à inicial</a>
+
+</body>
+</html>

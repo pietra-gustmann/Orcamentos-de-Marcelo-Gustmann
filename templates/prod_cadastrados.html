@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastrados</title>
+    <style>
+        li{
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+
+
+<h1>Itens Cadastrados</h1>
+
+{% if produtos %}
+    <ul>
+        {% for produto in produtos %}
+            <li>
+                <strong>ID:</strong> {{ produto.id }} <br>
+                <strong>Nome:</strong> {{ produto.nome }} <br>
+                <img src="{{ url_for('imagem', id=produto.id) }}"
+                 alt="Imagem do produto"
+                 width="100"
+                 heigh="60">
+                 <br><br>
+                 
+                <form action="{{ url_for('excluir_produto', id=produto.id) }}" 
+                    method="POST"
+                    onsubmit="return confirm('Tem certeza que deseja excluir este produto?');">
+
+                    <button type="submit" style="color: red;">
+                        🗑️ Excluir produto
+                    </button>
+                </form>
+                <hr>
+            </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+<br><a href="{{url_for('home')}}">Voltar à inicial</a><br>
+</body>
+</html>

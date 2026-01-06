@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casa</title>
+    <style>
+        *{
+            text-align: center;
+        }
+    </style>
+    
+</head>
+<body>
+    
+    <h1>Editar Orçamento</h1>
+
+<a href="{{url_for('home')}}">Voltar à inicial</a><br><br>
+
+<form method="POST" action="{{ url_for('atualizar_orcamento', id_orcamento=orcamento.id_orcamento) }}">
+
+    <label>Cliente:</label>
+    <input type="text" name="cliente" value="{{ orcamento.cliente }}" required>
+
+    <label>Cidade:</label>
+    <input type="text" name="cidade" value="{{ orcamento.cidade }}" required>
+
+    <br><br><hr>
+
+    {% for item in itens %}
+        <input type="hidden" name="item_id[]" value="{{ item.rowid }}">
+
+        <strong style="font-size: 30px;">{{ item.nome }}</strong><br>
+
+        Quantidade:
+        <input type="number" name="quantidade[]" value="{{ item.quantidade }}"><br><br>
+
+        Cor:
+        <input type="text" name="cor[]" value="{{ item.cor }}"><br><br>
+
+        Medida:
+        <input type="text" name="medida[]" value="{{ item.medida }}"><br><br>
+
+        Vidro:
+        <input type="text" name="vidro[]" value="{{ item.vidro }}"><br><br>
+
+        Unitário:
+        <input type="number" step="0.01" name="unitario[]" value="{{ item.unitario }}"><br><br>
+
+        Local:
+        <input type="text" name="local[]" value="{{ item.local }}"><br><br>
+
+        <hr>
+    {% endfor %}
+
+    <h2>Deseja adicionar mais algum item?</h2>
+
+    <!-- ⚠️ ESSA DIV É O QUE FAZ O BOTÃO FUNCIONAR -->
+    <div id="novos-itens"></div>
+
+    <button type="button" onclick="adicionarItem()">➕ Adicionar item</button>
+
+    <br><br>
+
+    <button type="submit">💾 Salvar alterações</button>
+
+</form>
+
+<script>
+function adicionarItem() {
+    const div = document.createElement("div");
+    div.innerHTML = `
+        <hr>
+        Produto:
+        <select name="novo_id_produto[]">
+            {% for p in produtos %}
+                <option value="{{ p.id }}">{{ p.nome }}</option>
+            {% endfor %}
+        </select><br><br>
+
+        Quantidade:
+        <input type="number" name="novo_quantidade[]"><br><br>
+
+        Cor:
+        <input type="text" name="novo_cor[]"><br><br>
+
+        Medida:
+        <input type="text" name="novo_medida[]"><br><br>
+
+        Vidro:
+        <input type="text" name="novo_vidro[]"><br><br>
+
+        Valor Unitário:
+        <input type="number" step="0.01" name="novo_unitario[]"><br><br>
+
+        Local de Aplicação:
+        <input type="text" name="novo_local[]"><br><br>
+    `;
+    document.getElementById("novos-itens").appendChild(div);
+}
+</script>
+
+</body>
+</html>
