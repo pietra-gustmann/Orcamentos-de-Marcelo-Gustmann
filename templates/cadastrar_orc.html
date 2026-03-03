@@ -31,18 +31,8 @@
     
     <hr><br>
 
-    <label>Produto:</label><br>
-    <select name="id_produto" required>
-        <option value="">-- Selecione um produto --</option>
-
-        {% for produto in produtos %}
-            <option value="{{ produto.id }}">
-                {{ produto.id }}
-            </option>
-        {% endfor %}
-    </select>
-    <br><br>
-
+    <label>Código do Produto:</label>
+    <input type="text" name="id_produto" required><br><br>
 
     <label>Quantidade:</label>
     <input type="number" name="quantidade" required><br><br>
@@ -53,7 +43,7 @@
     <label>Medida (L x A):</label>
     <input type="text" name="medida" required><br><br>
 
-    <label>Tipo de vidro:</label>
+    <label>Tipo de vidro/material:</label>
     <input type="text" name="vidro" required><br><br>
 
     <label>Valor unitário (Informe com ponto entre os reais e centavos invés de vírgula):</label>
@@ -61,6 +51,11 @@
 
     <label>Local de aplicação:</label>
     <input type="text" name="local"><br><br>
+
+    <label>
+        <input type="checkbox" name="nao_incluso">
+        Não incluir no valor final
+    </label><br><br>
 
     <!-- 🔹 BOTÕES DIFERENTES, MESMO FORM -->
     <button type="submit" name="acao" value="adicionar">
@@ -70,6 +65,7 @@
     <button type="submit" name="acao" value="salvar">
         📄 Salvar
     </button>
+
 
 </form>
 

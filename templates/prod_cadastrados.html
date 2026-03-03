@@ -31,10 +31,17 @@
                     method="POST"
                     onsubmit="return confirm('Tem certeza que deseja excluir este produto?');">
 
-                    <button type="submit" style="color: red;">
+                    <button type="submit" style="color: red; padding-left: 13px; padding-right: 13px">
                         🗑️ Excluir produto
-                    </button>
-                </form>
+                    </button><br>
+                </form><br>
+
+
+                <a style="border: solid, 2px, black; padding: 2px; text-decoration: none; font-size: 17px;" href="{{ url_for('editar_prod', id=produto.id) }}">
+                        ✏️ Alterar Produto
+                    </a> <br>
+
+
                 <hr>
             </li>
         {% endfor %}

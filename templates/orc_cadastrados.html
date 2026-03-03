@@ -20,20 +20,20 @@
             <li>
                 <strong>ID:</strong> {{ orcamento.id_orcamento }} <br>
                 <strong>Nome do Cliente:</strong> {{ orcamento.cliente }} <br>
-                <strong>Cidade:</strong> {{ orcamento.cidade }} <br>
+                <strong>Cidade:</strong> {{ orcamento.cidade }} <br><br>
 
                     <a style="border: solid, 2px, black; padding: 2px; text-decoration: none; font-size: 19.8px;" href="{{ url_for('editar_orcamento', id_orcamento=orcamento.id_orcamento) }}">
                         ✏️ Editar orçamento
-                    </a> 
+                    </a> <br>
                 
                 <form action="{{ url_for('excluir_orcamento', id_orcamento=orcamento.id_orcamento) }}" 
                     method="POST"
                     onsubmit="return confirm('Tem certeza que deseja excluir este produto?');">
 
-                     <button type="submit" style="color: red;font-size: 16.7px; background-color: white;">
+                     <br><button type="submit" style="color: red;font-size: 16.7px; background-color: white;">
                         🗑️ Excluir orcamento
                     </button>
-                </form> 
+                </form> <br>
                 <a style="border: solid, 2px, black; padding: 2px; text-decoration: none; font-size: 17.1px;" href="{{ url_for('finalizar_orcamento', id_orcamento=orcamento.id_orcamento) }}">
                         ✅ Finalizar Orçamento
                     </a> <br>

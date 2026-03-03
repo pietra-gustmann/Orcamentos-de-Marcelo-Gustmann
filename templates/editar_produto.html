@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Produto</title>
+    <style>
+        *{
+            text-align: center;
+        }
+    </style>
+    
+</head>
+<body>
+    
+    <h1>Editar Produto</h1>
+
+<form method="POST"
+      action="{{ url_for('atualizar_prod', id=produto.id) }}"
+      enctype="multipart/form-data">
+
+    <label>Código:</label>
+    <input type="text" name="codigo" value="{{ produto.id }}" required>
+
+    <label>Nome:</label>
+    <input type="text" name="nome" value="{{ produto.nome }}" required>
+
+    <br><br>
+
+    <p>Imagem atual:</p>
+    <img src="{{ url_for('imagem', id=produto.id) }}" width="150"><br><br>
+
+    <label>Trocar imagem :</label>
+    <input type="file" name="imagem">
+
+    <br><br><hr>
+
+    <button type="submit">💾 Salvar alterações</button>
+
+</form>
+
+
+</body>
+</html>
