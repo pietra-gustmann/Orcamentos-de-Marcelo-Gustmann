@@ -19,7 +19,6 @@ def init_db():
         os.makedirs("instance")
 
     conn = sqlite3.connect("instance/banco_trabalho.db")
-    conn = sqlite3.connect("instance/banco_trabalho.db")
     conn.execute("PRAGMA foreign_keys = ON")
 
     cursor = conn.cursor()
@@ -58,14 +57,34 @@ def init_db():
     );
     """)
 
+    for row in cursor.fetchall():
+        print(row["id"], row["ordem"])
+
     conn.commit()
     conn.close()
     
 def fmt_money_br(valor):
     return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-init_db()
+def normalizar_ordem(id_orcamento, cursor):
+    cursor.execute("""
+        SELECT id
+        FROM item_orcamento
+        WHERE id_orcamento = ?
+        ORDER BY ordem, id
+    """, (id_orcamento,))
 
+    itens = cursor.fetchall()
+
+    nova_ordem = 1
+    for item in itens:
+        cursor.execute("""
+            UPDATE item_orcamento
+            SET ordem = ?
+            WHERE id = ?
+        """, (nova_ordem, item["id"]))
+        nova_ordem += 1
+        
 @app.route('/')
 def home():
     return render_template("index.html")
@@ -545,6 +564,10 @@ def atualizar_orcamento(id_orcamento):
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
+    
+    print("===== DEBUG FORM =====")
+    print(request.form)
+    print("======================")
 
     cliente = request.form.get("cliente")
     cidade = request.form.get("cidade")
@@ -604,6 +627,11 @@ def atualizar_orcamento(id_orcamento):
             continue
 
         item_referencia = referencias[i]
+        
+        print("---- TESTE INSERÇÃO ----")
+        print("ID_ORCAMENTO:", id_orcamento)
+        print("ITEM_REFERENCIA RECEBIDO:", item_referencia)
+
         marcado = 1 if str(i) in novo_nao_incluso_lista else 0
 
         quantidade = request.form.getlist("novo_quantidade[]")[i]
@@ -625,6 +653,8 @@ def atualizar_orcamento(id_orcamento):
             """, (item_referencia, id_orcamento))
 
             resultado = cursor.fetchone()
+            
+            print("RESULTADO SELECT:", resultado)
 
             if resultado and resultado["ordem"] is not None:
 
@@ -671,15 +701,8 @@ def atualizar_orcamento(id_orcamento):
             ordem_base,
             marcado
         ))
- 
-    cursor.execute("""
-        SELECT COUNT(*) as total
-        FROM item_orcamento
-        WHERE ordem IS NULL
-    """)
-    if cursor.fetchone()["total"] > 0:
-        raise Exception("ERRO: Existe item com ordem NULL")
 
+    normalizar_ordem(id_orcamento, cursor)
     conn.commit()
     conn.close()
 
@@ -1237,4 +1260,5 @@ def gerar_pdf_completo():
     
         
 if __name__ == "__main__":
+    init_db()
     app.run(debug=True) 
