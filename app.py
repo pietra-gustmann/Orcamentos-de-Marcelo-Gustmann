@@ -17,50 +17,45 @@ DB_PATH = os.path.join(app.instance_path, "banco_trabalho.db")
 
 def init_db():
 
-    if not os.path.exists("instance"):
-        os.makedirs("instance")
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conexao.cursor()
+        conn.execute("PRAGMA foreign_keys = ON")
 
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("PRAGMA foreign_keys = ON")
+        cursor = conn.cursor()
 
-    cursor = conn.cursor()
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS produto (
+            id TEXT PRIMARY KEY,
+            nome TEXT NOT NULL,
+            imagem BLOB
+        );
+        """)
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS produto (
-        id TEXT PRIMARY KEY,
-        nome TEXT NOT NULL,
-        imagem BLOB
-    );
-    """)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS orcamento (
+            id_orcamento INTEGER PRIMARY KEY AUTOINCREMENT,
+            cliente TEXT NOT NULL,
+            cidade TEXT NOT NULL
+        );
+        """)
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS orcamento (
-        id_orcamento INTEGER PRIMARY KEY AUTOINCREMENT,
-        cliente TEXT NOT NULL,
-        cidade TEXT NOT NULL
-    );
-    """)
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS item_orcamento (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        id_orcamento INTEGER,
-        id_produto TEXT,
-        nao_incluso INTEGER DEFAULT 0,
-        quantidade INTEGER,
-        cor TEXT,
-        medida TEXT,
-        vidro TEXT,
-        unitario REAL,
-        local TEXT,
-        ordem INTEGER NOT NULL DEFAULT 0,
-        FOREIGN KEY(id_orcamento) REFERENCES orcamento(id_orcamento) ON DELETE CASCADE,
-        FOREIGN KEY(id_produto) REFERENCES produto(id) ON UPDATE CASCADE
-    );
-    """)
-
-    for row in cursor.fetchall():
-        print(row["id"], row["ordem"])
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS item_orcamento (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_orcamento INTEGER,
+            id_produto TEXT,
+            nao_incluso INTEGER DEFAULT 0,
+            quantidade INTEGER,
+            cor TEXT,
+            medida TEXT,
+            vidro TEXT,
+            unitario REAL,
+            local TEXT,
+            ordem INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY(id_orcamento) REFERENCES orcamento(id_orcamento) ON DELETE CASCADE,
+            FOREIGN KEY(id_produto) REFERENCES produto(id) ON UPDATE CASCADE
+        );
+        """)
 
     conn.commit()
     conn.close()
@@ -86,7 +81,9 @@ def normalizar_ordem(id_orcamento, cursor):
             WHERE id = ?
         """, (nova_ordem, item["id"]))
         nova_ordem += 1
-        
+     
+init_db()
+   
 @app.route('/')
 def home():
     return render_template("index.html")
@@ -1262,5 +1259,4 @@ def gerar_pdf_completo():
     
         
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True) 
