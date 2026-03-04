@@ -14,8 +14,11 @@ app = Flask(__name__)
 app.secret_key = "Trabalhoooooooooooooooooooooo"
 
 def init_db():
-    # Garante que a pasta instance exista
-    os.makedirs("instance", exist_ok=True)
+
+    if not os.path.exists("instance"):
+        os.makedirs("instance")
+
+    conn = sqlite3.connect("instance/banco_trabalho.db")
     conn = sqlite3.connect("instance/banco_trabalho.db")
     conn.execute("PRAGMA foreign_keys = ON")
 
