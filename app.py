@@ -3,6 +3,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 import sqlite3 
 import io
+import os
 from reportlab.lib.utils import simpleSplit
 from reportlab.lib import colors
 from reportlab.lib.colors import Color
@@ -13,6 +14,8 @@ app = Flask(__name__)
 app.secret_key = "Trabalhoooooooooooooooooooooo"
 
 def init_db():
+    # Garante que a pasta instance exista
+    os.makedirs("instance", exist_ok=True)
     conn = sqlite3.connect("instance/banco_trabalho.db")
     conn.execute("PRAGMA foreign_keys = ON")
 
