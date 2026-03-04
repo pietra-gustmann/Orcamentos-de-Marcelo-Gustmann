@@ -18,7 +18,7 @@ DB_PATH = os.path.join(app.instance_path, "banco_trabalho.db")
 def init_db():
 
     with sqlite3.connect(DB_PATH) as conn:
-        cursor = conexao.cursor()
+        cursor = conn.cursor()
         conn.execute("PRAGMA foreign_keys = ON")
 
         cursor = conn.cursor()
