@@ -12,13 +12,15 @@ minha_cor = Color(0.7, 0.1, 0.2)
 
 app = Flask(__name__)
 app.secret_key = "Trabalhoooooooooooooooooooooo"
+os.makedirs(app.instance_path, exist_ok=True)
+DB_PATH = os.path.join(app.instance_path, "banco_trabalho.db")
 
 def init_db():
 
     if not os.path.exists("instance"):
         os.makedirs("instance")
 
-    conn = sqlite3.connect("instance/banco_trabalho.db")
+    conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")
 
     cursor = conn.cursor()
@@ -91,7 +93,7 @@ def home():
 
 @app.route('/prod_cadastrados')
 def prod_cadastrados():
-    with sqlite3.connect("instance/banco_trabalho.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
@@ -103,7 +105,7 @@ def prod_cadastrados():
 
 @app.route("/excluir_produto/<id>", methods=["POST"])
 def excluir_produto(id):
-    with sqlite3.connect("instance/banco_trabalho.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
@@ -115,7 +117,7 @@ def excluir_produto(id):
 
 @app.route('/imagem/<id>')
 def imagem(id):
-    with sqlite3.connect("instance/banco_trabalho.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
@@ -130,7 +132,7 @@ def imagem(id):
 
 @app.route("/cadastro_novo_prod", methods=['GET' , 'POST'])
 def cadastro_novo_prod():
-    with sqlite3.connect("instance/banco_trabalho.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
@@ -151,7 +153,7 @@ def cadastro_novo_prod():
 
 @app.route("/editar_prod/<id>")
 def editar_prod(id):
-    with sqlite3.connect("instance/banco_trabalho.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
@@ -175,7 +177,7 @@ def atualizar_prod(id):
     novo_nome = request.form["nome"]
     nova_imagem = request.files.get("imagem")
 
-    with sqlite3.connect("instance/banco_trabalho.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
 
@@ -203,7 +205,7 @@ def atualizar_prod(id):
 
 @app.route("/cadastrar_orc", methods=["GET", "POST"])
 def cadastrar_orc():
-    with sqlite3.connect("instance/banco_trabalho.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
@@ -477,7 +479,7 @@ def cadastrar_orc():
          
 @app.route("/orc_cadastrados") 
 def orc_cadastrados():
-    with sqlite3.connect("instance/banco_trabalho.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
@@ -489,7 +491,7 @@ def orc_cadastrados():
 
 @app.route("/excluir_orcamento/<id_orcamento>", methods=["POST"])
 def excluir_orcamento(id_orcamento):
-    with sqlite3.connect("instance/banco_trabalho.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
@@ -504,7 +506,7 @@ def excluir_item_orcamento(item_id):
 
     import sqlite3
 
-    conn = sqlite3.connect("instance/banco_trabalho.db", timeout=10)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
 
@@ -517,7 +519,7 @@ def excluir_item_orcamento(item_id):
 
 @app.route("/editar_orcamento/<int:id_orcamento>")
 def editar_orcamento(id_orcamento):
-    with sqlite3.connect("instance/banco_trabalho.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
@@ -560,7 +562,7 @@ def editar_orcamento(id_orcamento):
 @app.route("/atualizar_orcamento/<int:id_orcamento>", methods=["POST"])
 def atualizar_orcamento(id_orcamento):
 
-    conn = sqlite3.connect("instance/banco_trabalho.db", timeout=10)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
@@ -711,7 +713,7 @@ def atualizar_orcamento(id_orcamento):
 @app.route("/gerar_pdf/<int:id_orcamento>")
 def gerar_pdf(id_orcamento):
 
-    conn = sqlite3.connect("instance/banco_trabalho.db", timeout=10)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     cursor = conn.cursor()
@@ -882,7 +884,7 @@ def gerar_pdf(id_orcamento):
 
 @app.route("/finalizar_orcamento/<int:id_orcamento>", methods=["GET", "POST"])
 def finalizar_orcamento(id_orcamento):
-    with sqlite3.connect("instance/banco_trabalho.db") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         cursor = conn.cursor()
@@ -945,7 +947,7 @@ def finalizar_orcamento(id_orcamento):
 
 @app.route("/gerar_pdf_completo")
 def gerar_pdf_completo():
-    conn = sqlite3.connect("instance/banco_trabalho.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cliente = session.get("cliente")
