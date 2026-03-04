@@ -46,7 +46,7 @@ def init_db():
         vidro TEXT,
         unitario REAL,
         local TEXT,
-        ordem INTEGER,
+        ordem INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY(id_orcamento) REFERENCES orcamento(id_orcamento) ON DELETE CASCADE,
         FOREIGN KEY(id_produto) REFERENCES produto(id) ON UPDATE CASCADE
     );
@@ -549,12 +549,17 @@ def atualizar_orcamento(id_orcamento):
         WHERE id_orcamento = ?
     """, (cliente, cidade, id_orcamento))
 
-    # 🔹 Atualiza itens já existentes
+    # ==========================
+    # 🔹 ATUALIZA ITENS EXISTENTES
+    # ==========================
+
     ids = request.form.getlist("item_id[]")
     nao_incluso_lista = request.form.getlist("nao_incluso[]")
 
     for i in range(len(ids)):
+
         marcado = 1 if str(ids[i]) in nao_incluso_lista else 0
+
         cursor.execute("""
             UPDATE item_orcamento
             SET quantidade = ?, 
@@ -577,8 +582,10 @@ def atualizar_orcamento(id_orcamento):
             id_orcamento
         ))
 
-    # 🔹 Inserção de novos itens
-        # 🔹 Inserção de novos itens
+    # ==========================
+    # 🔹 INSERÇÃO DE NOVOS ITENS
+    # ==========================
+
     novos_ids = request.form.getlist("novo_id_produto[]")
     referencias = request.form.getlist("inserir_depois_id[]")
     novo_nao_incluso_lista = request.form.getlist("novo_nao_incluso[]")
@@ -586,9 +593,11 @@ def atualizar_orcamento(id_orcamento):
     for i in range(len(novos_ids)):
 
         id_produto = novos_ids[i].strip()
+
         if not id_produto:
             continue
 
+        item_referencia = referencias[i]
         marcado = 1 if str(i) in novo_nao_incluso_lista else 0
 
         quantidade = request.form.getlist("novo_quantidade[]")[i]
@@ -598,14 +607,13 @@ def atualizar_orcamento(id_orcamento):
         unitario = float(request.form.getlist("novo_unitario[]")[i] or 0)
         local = request.form.getlist("novo_local[]")[i]
 
-        item_referencia = referencias[i]
-
+        # 🔹 Define ordem base
         if item_referencia and item_referencia.isdigit():
 
             item_referencia = int(item_referencia)
 
             cursor.execute("""
-                SELECT ordem 
+                SELECT ordem
                 FROM item_orcamento
                 WHERE id = ? AND id_orcamento = ?
             """, (item_referencia, id_orcamento))
@@ -616,7 +624,7 @@ def atualizar_orcamento(id_orcamento):
 
                 ordem_base = resultado["ordem"] + 1
 
-                # 🔥 DESLOCAMENTO TEM QUE ESTAR AQUI
+                # 🔥 DESLOCA ITENS ABAIXO
                 cursor.execute("""
                     UPDATE item_orcamento
                     SET ordem = ordem + 1
@@ -657,13 +665,14 @@ def atualizar_orcamento(id_orcamento):
             ordem_base,
             marcado
         ))
-        
-        cursor.execute("""
-            SELECT id, ordem 
-            FROM item_orcamento
-            WHERE id_orcamento = ?
-            ORDER BY ordem
-        """, (id_orcamento,))
+ 
+    cursor.execute("""
+        SELECT COUNT(*) as total
+        FROM item_orcamento
+        WHERE ordem IS NULL
+    """)
+    if cursor.fetchone()["total"] > 0:
+        raise Exception("ERRO: Existe item com ordem NULL")
 
     conn.commit()
     conn.close()
