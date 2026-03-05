@@ -1,26 +1,27 @@
 from flask import Flask, render_template, redirect, request, session, Response, url_for
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
-import sqlite3 
 import io
 import os
 from reportlab.lib.utils import simpleSplit
 from reportlab.lib import colors
 from reportlab.lib.colors import Color
+import psycopg2
+import psycopg2.extras
 
-minha_cor = Color(0.7, 0.1, 0.2)  
+DATABASE_URL = os.environ.get("DATABASE_URL") 
 
 app = Flask(__name__)
 app.secret_key = "Trabalhoooooooooooooooooooooo"
-os.makedirs(app.instance_path, exist_ok=True)
-DB_PATH = os.path.join(app.instance_path, "banco_trabalho.db")
+
+def get_connection():
+    return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+
+minha_cor = Color(0.7, 0.1, 0.2) 
 
 def init_db():
 
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        conn.execute("PRAGMA foreign_keys = ON")
-
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -33,7 +34,7 @@ def init_db():
 
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS orcamento (
-            id_orcamento INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_orcamento SERIAL PRIMARY KEY,
             cliente TEXT NOT NULL,
             cidade TEXT NOT NULL
         );
@@ -41,7 +42,7 @@ def init_db():
 
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS item_orcamento (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             id_orcamento INTEGER,
             id_produto TEXT,
             nao_incluso INTEGER DEFAULT 0,
@@ -67,7 +68,7 @@ def normalizar_ordem(id_orcamento, cursor):
     cursor.execute("""
         SELECT id
         FROM item_orcamento
-        WHERE id_orcamento = ?
+        WHERE id_orcamento = %s
         ORDER BY ordem, id
     """, (id_orcamento,))
 
@@ -77,22 +78,20 @@ def normalizar_ordem(id_orcamento, cursor):
     for item in itens:
         cursor.execute("""
             UPDATE item_orcamento
-            SET ordem = ?
-            WHERE id = ?
+            SET ordem = %s
+            WHERE id = %s
         """, (nova_ordem, item["id"]))
         nova_ordem += 1
-     
+    
 init_db()
-   
+    
 @app.route('/')
 def home():
     return render_template("index.html")
 
 @app.route('/prod_cadastrados')
 def prod_cadastrados():
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         cursor.execute("SELECT * FROM produto")
@@ -102,24 +101,20 @@ def prod_cadastrados():
 
 @app.route("/excluir_produto/<id>", methods=["POST"])
 def excluir_produto(id):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
+    with get_connection() as conn:
         cursor = conn.cursor()
 
-        cursor.execute("DELETE FROM produto WHERE id = ?", (id,))
+        cursor.execute("DELETE FROM produto WHERE id = %s", (id,))
         conn.commit()
 
     return redirect("/prod_cadastrados")
 
 @app.route('/imagem/<id>')
 def imagem(id):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
+    with get_connection() as conn:
         cursor = conn.cursor()
 
-        cursor.execute("SELECT imagem FROM produto WHERE id = ?", (id,))
+        cursor.execute("SELECT imagem FROM produto WHERE id = %s", (id,))
         img = cursor.fetchone()
 
         if img:
@@ -129,9 +124,7 @@ def imagem(id):
 
 @app.route("/cadastro_novo_prod", methods=['GET' , 'POST'])
 def cadastro_novo_prod():
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
+    with get_connection() as conn:
         cursor = conn.cursor()
         
         if request.method == 'POST':
@@ -142,7 +135,7 @@ def cadastro_novo_prod():
             imagem = imagem.read()
             
             cursor.execute("""INSERT INTO produto (id, nome, imagem)
-                VALUES (?,?,?) """, (id, nome, imagem))
+                VALUES (%s,%s,%s) """, (id, nome, imagem))
 
             conn.commit()
 
@@ -150,14 +143,12 @@ def cadastro_novo_prod():
 
 @app.route("/editar_prod/<id>")
 def editar_prod(id):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         # orçamento
         cursor.execute(
-            "SELECT * FROM produto WHERE id = ?",
+            "SELECT * FROM produto WHERE id = %s",
             (id,)
         )
         produto = cursor.fetchone()
@@ -174,8 +165,7 @@ def atualizar_prod(id):
     novo_nome = request.form["nome"]
     nova_imagem = request.files.get("imagem")
 
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("PRAGMA foreign_keys = ON")
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         # 🔹 Se enviou nova imagem
@@ -184,16 +174,16 @@ def atualizar_prod(id):
 
             cursor.execute("""
                 UPDATE produto
-                SET id = ?, nome = ?, imagem = ?
-                WHERE id = ?
+                SET id = %s, nome = %s, imagem = %s
+                WHERE id = %s
             """, (novo_id, novo_nome, imagem_bytes, id))
 
         else:
             # 🔹 Se NÃO enviou imagem → mantém a antiga
             cursor.execute("""
                 UPDATE produto
-                SET id = ?, nome = ?
-                WHERE id = ?
+                SET id = %s, nome = %s
+                WHERE id = %s
             """, (novo_id, novo_nome, id))
 
         conn.commit()
@@ -202,9 +192,7 @@ def atualizar_prod(id):
 
 @app.route("/cadastrar_orc", methods=["GET", "POST"])
 def cadastrar_orc():
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         cursor.execute("SELECT id, nome FROM produto")
@@ -223,7 +211,7 @@ def cadastrar_orc():
 
                 cursor.execute("""
                     INSERT INTO orcamento (cliente, cidade)
-                    VALUES (?, ?)
+                    VALUES (%s, %s)
                 """, (cliente, cidade))
 
                 session["id_orcamento"] = cursor.lastrowid
@@ -250,7 +238,7 @@ def cadastrar_orc():
                         unitario,
                         local,
                         nao_incluso
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     id_orcamento,
                     request.form["id_produto"],
@@ -287,7 +275,7 @@ def cadastrar_orc():
                         unitario,
                         local,
                         nao_incluso
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?,?)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s,%s)
                 """, (
                     id_orcamento,
                     request.form["id_produto"],
@@ -317,7 +305,7 @@ def cadastrar_orc():
                         io.nao_incluso
                     FROM item_orcamento io
                     JOIN produto p ON p.id = io.id_produto
-                    WHERE io.id_orcamento = ?
+                    WHERE io.id_orcamento = %s
                 """, (id_orcamento,))
 
                 itens = cursor.fetchall()
@@ -476,9 +464,7 @@ def cadastrar_orc():
          
 @app.route("/orc_cadastrados") 
 def orc_cadastrados():
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         cursor.execute("SELECT * FROM orcamento")
@@ -488,12 +474,10 @@ def orc_cadastrados():
 
 @app.route("/excluir_orcamento/<id_orcamento>", methods=["POST"])
 def excluir_orcamento(id_orcamento):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
+    with get_connection() as conn:
         cursor = conn.cursor()
 
-        cursor.execute("DELETE FROM orcamento WHERE id_orcamento = ?", (id_orcamento,))
+        cursor.execute("DELETE FROM orcamento WHERE id_orcamento = %s", (id_orcamento,))
         conn.commit()
 
     return redirect("/orc_cadastrados")
@@ -501,31 +485,26 @@ def excluir_orcamento(id_orcamento):
 @app.route("/excluir_item_orcamento/<int:item_id>", methods=["POST"])
 def excluir_item_orcamento(item_id):
 
-    import sqlite3
+    with get_connection() as conn:
+        cursor = conn.cursor()
 
-    conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.execute("PRAGMA foreign_keys = ON")
-    cursor = conn.cursor()
+        cursor.execute("DELETE FROM item_orcamento WHERE id = %s", (item_id,))
+        
+        conn.commit()
+        conn.close()
 
-    cursor.execute("DELETE FROM item_orcamento WHERE id = ?", (item_id,))
-    
-    conn.commit()
-    conn.close()
-
-    return "", 200
+        return "", 200
 
 @app.route("/editar_orcamento/<int:id_orcamento>")
 def editar_orcamento(id_orcamento):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         # 🔹 Buscar orçamento
         cursor.execute("""
             SELECT *
             FROM orcamento
-            WHERE id_orcamento = ?
+            WHERE id_orcamento = %s
         """, (id_orcamento,))
         orcamento = cursor.fetchone()
 
@@ -537,7 +516,7 @@ def editar_orcamento(id_orcamento):
                 p.imagem
             FROM item_orcamento io
             JOIN produto p ON p.id = io.id_produto
-            WHERE io.id_orcamento = ?
+            WHERE io.id_orcamento = %s
             ORDER BY io.ordem ASC
         """, (id_orcamento,))
         itens = cursor.fetchall()
@@ -559,338 +538,332 @@ def editar_orcamento(id_orcamento):
 @app.route("/atualizar_orcamento/<int:id_orcamento>", methods=["POST"])
 def atualizar_orcamento(id_orcamento):
 
-    conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    cursor = conn.cursor()
-    
-    print("===== DEBUG FORM =====")
-    print(request.form)
-    print("======================")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        
+        print("===== DEBUG FORM =====")
+        print(request.form)
+        print("======================")
 
-    cliente = request.form.get("cliente")
-    cidade = request.form.get("cidade")
-
-    cursor.execute("""
-        UPDATE orcamento
-        SET cliente = ?, cidade = ?
-        WHERE id_orcamento = ?
-    """, (cliente, cidade, id_orcamento))
-
-    # ==========================
-    # 🔹 ATUALIZA ITENS EXISTENTES
-    # ==========================
-
-    ids = request.form.getlist("item_id[]")
-    nao_incluso_lista = request.form.getlist("nao_incluso[]")
-
-    for i in range(len(ids)):
-
-        marcado = 1 if str(ids[i]) in nao_incluso_lista else 0
+        cliente = request.form.get("cliente")
+        cidade = request.form.get("cidade")
 
         cursor.execute("""
-            UPDATE item_orcamento
-            SET quantidade = ?, 
-                cor = ?, 
-                medida = ?, 
-                vidro = ?, 
-                unitario = ?, 
-                local = ?, 
-                nao_incluso = ?
-            WHERE id = ? AND id_orcamento = ?
-        """, (
-            request.form.getlist("quantidade[]")[i],
-            request.form.getlist("cor[]")[i],
-            request.form.getlist("medida[]")[i],
-            request.form.getlist("vidro[]")[i],
-            float(request.form.getlist("unitario[]")[i] or 0),
-            request.form.getlist("local[]")[i],
-            marcado,
-            ids[i],
-            id_orcamento
-        ))
+            UPDATE orcamento
+            SET cliente = %s, cidade = %s
+            WHERE id_orcamento = %s
+        """, (cliente, cidade, id_orcamento))
 
-    # ==========================
-    # 🔹 INSERÇÃO DE NOVOS ITENS
-    # ==========================
+        # ==========================
+        # 🔹 ATUALIZA ITENS EXISTENTES
+        # ==========================
 
-    novos_ids = request.form.getlist("novo_id_produto[]")
-    referencias = request.form.getlist("inserir_depois_id[]")
-    novo_nao_incluso_lista = request.form.getlist("novo_nao_incluso[]")
+        ids = request.form.getlist("item_id[]")
+        nao_incluso_lista = request.form.getlist("nao_incluso[]")
 
-    for i in range(len(novos_ids)):
+        for i in range(len(ids)):
 
-        id_produto = novos_ids[i].strip()
-
-        if not id_produto:
-            continue
-
-        item_referencia = referencias[i]
-        
-        print("---- TESTE INSERÇÃO ----")
-        print("ID_ORCAMENTO:", id_orcamento)
-        print("ITEM_REFERENCIA RECEBIDO:", item_referencia)
-
-        marcado = 1 if str(i) in novo_nao_incluso_lista else 0
-
-        quantidade = request.form.getlist("novo_quantidade[]")[i]
-        cor = request.form.getlist("novo_cor[]")[i]
-        medida = request.form.getlist("novo_medida[]")[i]
-        vidro = request.form.getlist("novo_vidro[]")[i]
-        unitario = float(request.form.getlist("novo_unitario[]")[i] or 0)
-        local = request.form.getlist("novo_local[]")[i]
-
-        # 🔹 Define ordem base
-        if item_referencia and item_referencia.isdigit():
-
-            item_referencia = int(item_referencia)
+            marcado = 1 if str(ids[i]) in nao_incluso_lista else 0
 
             cursor.execute("""
-                SELECT ordem
-                FROM item_orcamento
-                WHERE id = ? AND id_orcamento = ?
-            """, (item_referencia, id_orcamento))
+                UPDATE item_orcamento
+                SET quantidade = %s, 
+                    cor = %s, 
+                    medida = %s, 
+                    vidro = %s, 
+                    unitario = %s, 
+                    local = %s, 
+                    nao_incluso = %s
+                WHERE id = %s AND id_orcamento = %s
+            """, (
+                request.form.getlist("quantidade[]")[i],
+                request.form.getlist("cor[]")[i],
+                request.form.getlist("medida[]")[i],
+                request.form.getlist("vidro[]")[i],
+                float(request.form.getlist("unitario[]")[i] or 0),
+                request.form.getlist("local[]")[i],
+                marcado,
+                ids[i],
+                id_orcamento
+            ))
 
-            resultado = cursor.fetchone()
+        # ==========================
+        # 🔹 INSERÇÃO DE NOVOS ITENS
+        # ==========================
+
+        novos_ids = request.form.getlist("novo_id_produto[]")
+        referencias = request.form.getlist("inserir_depois_id[]")
+        novo_nao_incluso_lista = request.form.getlist("novo_nao_incluso[]")
+
+        for i in range(len(novos_ids)):
+
+            id_produto = novos_ids[i].strip()
+
+            if not id_produto:
+                continue
+
+            item_referencia = referencias[i]
             
-            print("RESULTADO SELECT:", resultado)
+            print("---- TESTE INSERÇÃO ----")
+            print("ID_ORCAMENTO:", id_orcamento)
+            print("ITEM_REFERENCIA RECEBIDO:", item_referencia)
 
-            if resultado and resultado["ordem"] is not None:
+            marcado = 1 if str(i) in novo_nao_incluso_lista else 0
 
-                ordem_base = resultado["ordem"] + 1
+            quantidade = request.form.getlist("novo_quantidade[]")[i]
+            cor = request.form.getlist("novo_cor[]")[i]
+            medida = request.form.getlist("novo_medida[]")[i]
+            vidro = request.form.getlist("novo_vidro[]")[i]
+            unitario = float(request.form.getlist("novo_unitario[]")[i] or 0)
+            local = request.form.getlist("novo_local[]")[i]
 
-                # 🔥 DESLOCA ITENS ABAIXO
+            # 🔹 Define ordem base
+            if item_referencia and item_referencia.isdigit():
+
+                item_referencia = int(item_referencia)
+
                 cursor.execute("""
-                    UPDATE item_orcamento
-                    SET ordem = ordem + 1
-                    WHERE id_orcamento = ?
-                    AND ordem >= ?
-                """, (id_orcamento, ordem_base))
+                    SELECT ordem
+                    FROM item_orcamento
+                    WHERE id = %s AND id_orcamento = %s
+                """, (item_referencia, id_orcamento))
+
+                resultado = cursor.fetchone()
+                
+                print("RESULTADO SELECT:", resultado)
+
+                if resultado and resultado["ordem"] is not None:
+
+                    ordem_base = resultado["ordem"] + 1
+
+                    # 🔥 DESLOCA ITENS ABAIXO
+                    cursor.execute("""
+                        UPDATE item_orcamento
+                        SET ordem = ordem + 1
+                        WHERE id_orcamento = %s
+                        AND ordem >= %s
+                    """, (id_orcamento, ordem_base))
+
+                else:
+                    cursor.execute("""
+                        SELECT COALESCE(MAX(ordem),0)+1 AS nova_ordem
+                        FROM item_orcamento
+                        WHERE id_orcamento = %s
+                    """, (id_orcamento,))
+                    ordem_base = cursor.fetchone()["nova_ordem"]
 
             else:
                 cursor.execute("""
                     SELECT COALESCE(MAX(ordem),0)+1 AS nova_ordem
                     FROM item_orcamento
-                    WHERE id_orcamento = ?
+                    WHERE id_orcamento = %s
                 """, (id_orcamento,))
                 ordem_base = cursor.fetchone()["nova_ordem"]
 
-        else:
+            # 🔹 INSERT FINAL
             cursor.execute("""
-                SELECT COALESCE(MAX(ordem),0)+1 AS nova_ordem
-                FROM item_orcamento
-                WHERE id_orcamento = ?
-            """, (id_orcamento,))
-            ordem_base = cursor.fetchone()["nova_ordem"]
+                INSERT INTO item_orcamento
+                (id_orcamento, id_produto, quantidade, cor, medida, vidro, unitario, local, ordem, nao_incluso)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                id_orcamento,
+                id_produto,
+                quantidade,
+                cor,
+                medida,
+                vidro,
+                unitario,
+                local,
+                ordem_base,
+                marcado
+            ))
 
-        # 🔹 INSERT FINAL
-        cursor.execute("""
-            INSERT INTO item_orcamento
-            (id_orcamento, id_produto, quantidade, cor, medida, vidro, unitario, local, ordem, nao_incluso)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            id_orcamento,
-            id_produto,
-            quantidade,
-            cor,
-            medida,
-            vidro,
-            unitario,
-            local,
-            ordem_base,
-            marcado
-        ))
+        normalizar_ordem(id_orcamento, cursor)
+        conn.commit()
+        conn.close()
 
-    normalizar_ordem(id_orcamento, cursor)
-    conn.commit()
-    conn.close()
-
-    return redirect(url_for("editar_orcamento", id_orcamento=id_orcamento))
+        return redirect(url_for("editar_orcamento", id_orcamento=id_orcamento))
 
 @app.route("/gerar_pdf/<int:id_orcamento>")
 def gerar_pdf(id_orcamento):
 
-    conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    cursor = conn.cursor()
+    with get_connection() as conn:
+        cursor = conn.cursor()
 
-    # 🔹 Buscar itens
-    cursor.execute("""
-        SELECT p.nome, p.id as produto_id, i.quantidade, i.cor, i.medida, 
-               i.vidro, i.unitario, i.local, p.imagem, i.nao_incluso
-        FROM item_orcamento i
-        JOIN produto p ON p.id = i.id_produto
-        WHERE i.id_orcamento = ?
-        ORDER BY i.ordem
-    """, (id_orcamento,))
+        # 🔹 Buscar itens
+        cursor.execute("""
+            SELECT p.nome, p.id as produto_id, i.quantidade, i.cor, i.medida, 
+                i.vidro, i.unitario, i.local, p.imagem, i.nao_incluso
+            FROM item_orcamento i
+            JOIN produto p ON p.id = i.id_produto
+            WHERE i.id_orcamento = %s
+            ORDER BY i.ordem
+        """, (id_orcamento,))
 
-    itens = cursor.fetchall()
-    
-    cursor.execute("""
-        SELECT cliente, cidade
-        FROM orcamento
-        WHERE id_orcamento = ?
-    """, (id_orcamento,))
+        itens = cursor.fetchall()
+        
+        cursor.execute("""
+            SELECT cliente, cidade
+            FROM orcamento
+            WHERE id_orcamento = %s
+        """, (id_orcamento,))
 
-    orcamento = cursor.fetchone()
+        orcamento = cursor.fetchone()
 
-    cliente = orcamento["cliente"]
-    cidade = orcamento["cidade"]
-    
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer)
+        cliente = orcamento["cliente"]
+        cidade = orcamento["cidade"]
+        
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer)
 
-    c.drawImage("static/logo.png", 95, 765, width=400, height=70)
+        c.drawImage("static/logo.png", 95, 765, width=400, height=70)
 
-    # CABEÇALHO
+        # CABEÇALHO
 
-    c.drawString(50, 750, f"CLIENTE: {cliente}")
-    c.drawString(56, 735, f"CIDADE: {cidade}")
-    c.drawString(35, 710, "SEGUE ORÇAMENTO CONFORME SOLICITADO")
-    c.drawString(0, 703, "-" * 200)
+        c.drawString(50, 750, f"CLIENTE: {cliente}")
+        c.drawString(56, 735, f"CIDADE: {cidade}")
+        c.drawString(35, 710, "SEGUE ORÇAMENTO CONFORME SOLICITADO")
+        c.drawString(0, 703, "-" * 200)
 
-    y = 690
-    quantidade_total = 0
-    valor_total_orcamento = 0.0
+        y = 690
+        quantidade_total = 0
+        valor_total_orcamento = 0.0
 
-    for item in itens:
-        qtd = int(item["quantidade"])
-        unitario = float(item["unitario"])
-        total = qtd * unitario
+        for item in itens:
+            qtd = int(item["quantidade"])
+            unitario = float(item["unitario"])
+            total = qtd * unitario
 
-        if str(item["produto_id"]).startswith("-"):
+            if str(item["produto_id"]).startswith("-"):
 
-            if item["nao_incluso"] == 0:
-                quantidade_total += qtd
-                valor_total_orcamento += total
+                if item["nao_incluso"] == 0:
+                    quantidade_total += qtd
+                    valor_total_orcamento += total
 
-                c.drawString(30, y, str(qtd))
-                c.drawString(55, y, item["nome"])
+                    c.drawString(30, y, str(qtd))
+                    c.drawString(55, y, item["nome"])
 
-                c.drawString(55, y - 20, f"COR: {item['cor']}")
-                c.drawString(205, y - 20, f"MEDIDA: {item['medida']}")
-                c.drawString(55, y - 38, f"MATERIAL: {item['vidro']}")
-                c.drawString(55, y - 55, f"VALOR UNIT: R$ {fmt_money_br(unitario)}")
-                c.drawString(300, y - 55, f"TOTAL: R$ {fmt_money_br(total)}")
-                c.drawString(0, y - 68, "." * 200)
+                    c.drawString(55, y - 20, f"COR: {item['cor']}")
+                    c.drawString(205, y - 20, f"MEDIDA: {item['medida']}")
+                    c.drawString(55, y - 38, f"MATERIAL: {item['vidro']}")
+                    c.drawString(55, y - 55, f"VALOR UNIT: R$ {fmt_money_br(unitario)}")
+                    c.drawString(300, y - 55, f"TOTAL: R$ {fmt_money_br(total)}")
+                    c.drawString(0, y - 68, "." * 200)
 
-                if item["local"]:
-                    c.drawString(440, y, f"LOCAL: {item['local']}")
+                    if item["local"]:
+                        c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                imagem = ImageReader(io.BytesIO(item["imagem"]))
-                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
-                
-                y -= 85
-                if y < 80:
-                    c.showPage()
-                    y = 800
-                            
-            if item["nao_incluso"] == 1:
-                
-                c.drawString(30, y, str(qtd))
-                c.drawString(55, y, item["nome"])
-
-                c.drawString(55, y - 20, f"COR: {item['cor']}")
-                c.drawString(205, y - 20, f"MEDIDA: {item['medida']}")
-                c.drawString(55, y - 38, f"VIDRO: {item['vidro']}")
-                c.drawString(55, y - 55, f"VALOR UNIT: R$ {fmt_money_br(unitario)}")
-                c.drawString(300, y - 55, f"TOTAL: R$ {fmt_money_br(total)}")
-
-                if item["local"]:
-                    c.drawString(440, y, f"LOCAL: {item['local']}")
-
-                imagem = ImageReader(io.BytesIO(item["imagem"]))
-                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
-                
-                c.setFillColor(minha_cor)
-                c.setFont("Helvetica-Oblique", 12)
-                c.drawString(20 , y - 75 , "Este item é apenas para comparação, não está incluso no valor total do orçamento.")
-                c.setFillColor(colors.black)
-                c.drawString(0, y - 80, "." * 200)
-                
-                y -= 98
-                if y < 80:
-                    c.showPage()
-                    y = 800
+                    imagem = ImageReader(io.BytesIO(item["imagem"]))
+                    c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                     
-        else:
-            if item["nao_incluso"] == 0:
-                quantidade_total += qtd
-                valor_total_orcamento += total
+                    y -= 85
+                    if y < 80:
+                        c.showPage()
+                        y = 800
+                                
+                if item["nao_incluso"] == 1:
+                    
+                    c.drawString(30, y, str(qtd))
+                    c.drawString(55, y, item["nome"])
 
-                c.drawString(30, y, str(qtd))
-                c.drawString(55, y, item["nome"])
+                    c.drawString(55, y - 20, f"COR: {item['cor']}")
+                    c.drawString(205, y - 20, f"MEDIDA: {item['medida']}")
+                    c.drawString(55, y - 38, f"VIDRO: {item['vidro']}")
+                    c.drawString(55, y - 55, f"VALOR UNIT: R$ {fmt_money_br(unitario)}")
+                    c.drawString(300, y - 55, f"TOTAL: R$ {fmt_money_br(total)}")
 
-                c.drawString(55, y - 20, f"COR: {item['cor']}")
-                c.drawString(205, y - 20, f"MEDIDA: {item['medida']}")
-                c.drawString(55, y - 38, f"VIDRO: {item['vidro']}")
-                c.drawString(55, y - 55, f"VALOR UNIT: R$ {fmt_money_br(unitario)}")
-                c.drawString(300, y - 55, f"TOTAL: R$ {fmt_money_br(total)}")
-                c.drawString(0, y - 68, "." * 200)
+                    if item["local"]:
+                        c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                if item["local"]:
-                    c.drawString(440, y, f"LOCAL: {item['local']}")
+                    imagem = ImageReader(io.BytesIO(item["imagem"]))
+                    c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+                    
+                    c.setFillColor(minha_cor)
+                    c.setFont("Helvetica-Oblique", 12)
+                    c.drawString(20 , y - 75 , "Este item é apenas para comparação, não está incluso no valor total do orçamento.")
+                    c.setFillColor(colors.black)
+                    c.drawString(0, y - 80, "." * 200)
+                    
+                    y -= 98
+                    if y < 80:
+                        c.showPage()
+                        y = 800
+                        
+            else:
+                if item["nao_incluso"] == 0:
+                    quantidade_total += qtd
+                    valor_total_orcamento += total
 
-                imagem = ImageReader(io.BytesIO(item["imagem"]))
-                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
-                
-                y -= 85
-                if y < 80:
-                    c.showPage()
-                    y = 800
-                            
-            if item["nao_incluso"] == 1:
-                
-                c.drawString(30, y, str(qtd))
-                c.drawString(55, y, item["nome"])
+                    c.drawString(30, y, str(qtd))
+                    c.drawString(55, y, item["nome"])
 
-                c.drawString(55, y - 20, f"COR: {item['cor']}")
-                c.drawString(205, y - 20, f"MEDIDA: {item['medida']}")
-                c.drawString(55, y - 38, f"VIDRO: {item['vidro']}")
-                c.drawString(55, y - 55, f"VALOR UNIT: R$ {fmt_money_br(unitario)}")
-                c.drawString(300, y - 55, f"TOTAL: R$ {fmt_money_br(total)}")
+                    c.drawString(55, y - 20, f"COR: {item['cor']}")
+                    c.drawString(205, y - 20, f"MEDIDA: {item['medida']}")
+                    c.drawString(55, y - 38, f"VIDRO: {item['vidro']}")
+                    c.drawString(55, y - 55, f"VALOR UNIT: R$ {fmt_money_br(unitario)}")
+                    c.drawString(300, y - 55, f"TOTAL: R$ {fmt_money_br(total)}")
+                    c.drawString(0, y - 68, "." * 200)
 
-                if item["local"]:
-                    c.drawString(440, y, f"LOCAL: {item['local']}")
+                    if item["local"]:
+                        c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                imagem = ImageReader(io.BytesIO(item["imagem"]))
-                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
-                
-                c.setFillColor(minha_cor)
-                c.setFont("Helvetica-Oblique", 12)
-                c.drawString(20 , y - 75 , "Este item é apenas para comparação, não está incluso no valor total do orçamento.")
-                c.setFillColor(colors.black)
-                c.drawString(0, y - 80, "." * 200)
-                
-                y -= 98
-                if y < 80:
-                    c.showPage()
-                    y = 800
+                    imagem = ImageReader(io.BytesIO(item["imagem"]))
+                    c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+                    
+                    y -= 85
+                    if y < 80:
+                        c.showPage()
+                        y = 800
+                                
+                if item["nao_incluso"] == 1:
+                    
+                    c.drawString(30, y, str(qtd))
+                    c.drawString(55, y, item["nome"])
 
-    c.drawString(35, y - 15, f"QUANTIDADE TOTAL DE ITENS: {quantidade_total}")
-    c.drawString(35, y - 30, f"VALOR TOTAL DO ORÇAMENTO: R$ {fmt_money_br(valor_total_orcamento)}")
-    c.save()
-    buffer.seek(0)
+                    c.drawString(55, y - 20, f"COR: {item['cor']}")
+                    c.drawString(205, y - 20, f"MEDIDA: {item['medida']}")
+                    c.drawString(55, y - 38, f"VIDRO: {item['vidro']}")
+                    c.drawString(55, y - 55, f"VALOR UNIT: R$ {fmt_money_br(unitario)}")
+                    c.drawString(300, y - 55, f"TOTAL: R$ {fmt_money_br(total)}")
 
-    return Response(
-        buffer.getvalue(),
-        mimetype="application/pdf",
-        headers={"Content-Disposition": "inline; filename=orcamento.pdf"}
-    )
+                    if item["local"]:
+                        c.drawString(440, y, f"LOCAL: {item['local']}")
+
+                    imagem = ImageReader(io.BytesIO(item["imagem"]))
+                    c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+                    
+                    c.setFillColor(minha_cor)
+                    c.setFont("Helvetica-Oblique", 12)
+                    c.drawString(20 , y - 75 , "Este item é apenas para comparação, não está incluso no valor total do orçamento.")
+                    c.setFillColor(colors.black)
+                    c.drawString(0, y - 80, "." * 200)
+                    
+                    y -= 98
+                    if y < 80:
+                        c.showPage()
+                        y = 800
+
+        c.drawString(35, y - 15, f"QUANTIDADE TOTAL DE ITENS: {quantidade_total}")
+        c.drawString(35, y - 30, f"VALOR TOTAL DO ORÇAMENTO: R$ {fmt_money_br(valor_total_orcamento)}")
+        c.save()
+        buffer.seek(0)
+
+        return Response(
+            buffer.getvalue(),
+            mimetype="application/pdf",
+            headers={"Content-Disposition": "inline; filename=orcamento.pdf"}
+        )
 
 @app.route("/finalizar_orcamento/<int:id_orcamento>", methods=["GET", "POST"])
 def finalizar_orcamento(id_orcamento):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
+    with get_connection() as conn:
         cursor = conn.cursor()
 
         if request.method == "POST":
             cursor.execute("""
                 UPDATE orcamento
-                SET cliente = ?
-                WHERE id_orcamento = ?
+                SET cliente = %s
+                WHERE id_orcamento = %s
             """, (
                 request.form["cliente"],
                 id_orcamento
@@ -898,7 +871,7 @@ def finalizar_orcamento(id_orcamento):
             conn.commit()
 
         cursor.execute(
-            "SELECT * FROM orcamento WHERE id_orcamento = ?",
+            "SELECT * FROM orcamento WHERE id_orcamento = %s",
             (id_orcamento,)
         )
         orcamento = cursor.fetchone()
@@ -911,7 +884,7 @@ def finalizar_orcamento(id_orcamento):
                 p.id as produto_id
             FROM item_orcamento io
             JOIN produto p ON p.id = io.id_produto
-            WHERE io.id_orcamento = ?
+            WHERE io.id_orcamento = %s
             ORDER BY io.ordem ASC
         """, (id_orcamento,))
         itens = cursor.fetchall()
@@ -944,318 +917,318 @@ def finalizar_orcamento(id_orcamento):
 
 @app.route("/gerar_pdf_completo")
 def gerar_pdf_completo():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    with get_connection() as conn:
+        cursor = conn.cursor()
 
-    cliente = session.get("cliente")
-    cidade = session.get("cidade")
-    cpf = session.get("cpf")
-    endereco = session.get("endereco")
-    bairro = session.get("bairro")
-    cep = session.get("cep")
-    telefone = session.get("telefone")
-    data = session.get("data")
-    negociado = session.get("negociado", "")
-    entrada = session.get("entrada", "")
-    condicoes = session.get("condicoes", "")
-    prazo = session.get("prazo", "")
+        cliente = session.get("cliente")
+        cidade = session.get("cidade")
+        cpf = session.get("cpf")
+        endereco = session.get("endereco")
+        bairro = session.get("bairro")
+        cep = session.get("cep")
+        telefone = session.get("telefone")
+        data = session.get("data")
+        negociado = session.get("negociado", "")
+        entrada = session.get("entrada", "")
+        condicoes = session.get("condicoes", "")
+        prazo = session.get("prazo", "")
 
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer)
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer)
 
-    # LOGO
-    c.drawImage("static/logo.png", 95, 765, width=400, height=70)
+        # LOGO
+        c.drawImage("static/logo.png", 95, 765, width=400, height=70)
 
-    # CABEÇALHO
-    c.drawString(20, 750, f"CLIENTE: {cliente}")
-    c.drawString(325, 750, f"CPF/CNPJ: {cpf}")
-    c.drawString(20, 733, f"ENDEREÇO: {endereco}")
-    c.drawString(20, 715, f"BAIRRO: {bairro}")
-    c.drawString(20, 698, f"CIDADE: {cidade}")
-    c.drawString(325, 698, f"CEP: {cep}")
-    c.drawString(20, 681, f"TELEFONE: {telefone}")
-    c.drawString(20, 664, f"DATA: {data}")
-    c.drawString(20, 638, "SEGUE O PEDIDO")
-    c.drawString(0, 631, "-" * 200)
+        # CABEÇALHO
+        c.drawString(20, 750, f"CLIENTE: {cliente}")
+        c.drawString(325, 750, f"CPF/CNPJ: {cpf}")
+        c.drawString(20, 733, f"ENDEREÇO: {endereco}")
+        c.drawString(20, 715, f"BAIRRO: {bairro}")
+        c.drawString(20, 698, f"CIDADE: {cidade}")
+        c.drawString(325, 698, f"CEP: {cep}")
+        c.drawString(20, 681, f"TELEFONE: {telefone}")
+        c.drawString(20, 664, f"DATA: {data}")
+        c.drawString(20, 638, "SEGUE O PEDIDO")
+        c.drawString(0, 631, "-" * 200)
 
-    y = 618
-    quantidade_total = 0
-    valor_total_orcamento = 0.0
+        y = 618
+        quantidade_total = 0
+        valor_total_orcamento = 0.0
 
-    for item in session["itens"]:
-        qtd = int(item["quantidade"])
-        unitario = float(item["unitario"])
-        total = qtd * unitario
+        for item in session["itens"]:
+            qtd = int(item["quantidade"])
+            unitario = float(item["unitario"])
+            total = qtd * unitario
 
-        quantidade_total += qtd
-        valor_total_orcamento += total
-        
-        if str(item["produto_id"]).startswith("-"):
+            quantidade_total += qtd
+            valor_total_orcamento += total
+            
+            if str(item["produto_id"]).startswith("-"):
 
-            text = c.beginText(30, y)
-            text.textOut(str(item["quantidade"]))
-            c.drawText(text)
-
-            text = c.beginText(55, y)
-            text.textOut(item["nome"])
-            c.drawText(text)
-
-            text = c.beginText(55, y - 20)
-            text.setFont("Helvetica-Bold", 12)
-            text.textOut("COR: ")
-            text.setFont("Helvetica", 12)
-            text.textOut(item["cor"])
-            c.drawText(text)
-
-            text = c.beginText(205, y - 20)
-            text.setFont("Helvetica-Bold", 12)
-            text.textOut("MEDIDA: ")
-            text.setFont("Helvetica", 12)
-            text.textOut(item["medida"])
-            c.drawText(text)
-
-            text = c.beginText(55, y - 38)
-            text.setFont("Helvetica-Bold", 12)
-            text.textOut("MATERIAL: ")
-            text.setFont("Helvetica", 12)
-            text.textOut(item["vidro"])
-            c.drawText(text)
-
-            text = c.beginText(55, y - 55)
-            text.setFont("Helvetica-Bold", 12)
-            text.textOut("VALOR UNIT: ")
-            text.setFont("Helvetica", 12)
-            text.textOut(f"R$ {fmt_money_br(unitario)}")
-            c.drawText(text)
-
-            if item["local"].strip():
-                text = c.beginText(440, y)
-                text.setFont("Helvetica-Bold", 12)
-                text.textOut("LOCAL: ")
-                text.setFont("Helvetica", 12)
-                text.textOut(item["local"])
+                text = c.beginText(30, y)
+                text.textOut(str(item["quantidade"]))
                 c.drawText(text)
 
-            text = c.beginText(300, y - 55)
-            text.setFont("Helvetica-Bold", 13)
-            text.textOut(f"TOTAL: R$ {fmt_money_br(total)}")
-            c.drawText(text)
-
-            text = c.beginText(0, y - 70)
-            text.setFont("Helvetica", 11)
-            text.textOut("." * 250)
-            c.drawText(text)
-
-            cursor.execute(
-                "SELECT imagem FROM produto WHERE id = ?",
-                (item["id_produto"],)
-            )
-            img = cursor.fetchone()[0]
-
-            imagem = ImageReader(io.BytesIO(img))
-            c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
-
-            y -= 85
-            if y < 80:
-                c.showPage()
-                y = 800
-                
-        else:
-            text = c.beginText(30, y)
-            text.textOut(str(item["quantidade"]))
-            c.drawText(text)
-
-            text = c.beginText(55, y)
-            text.textOut(item["nome"])
-            c.drawText(text)
-
-            text = c.beginText(55, y - 20)
-            text.setFont("Helvetica-Bold", 12)
-            text.textOut("COR: ")
-            text.setFont("Helvetica", 12)
-            text.textOut(item["cor"])
-            c.drawText(text)
-
-            text = c.beginText(205, y - 20)
-            text.setFont("Helvetica-Bold", 12)
-            text.textOut("MEDIDA: ")
-            text.setFont("Helvetica", 12)
-            text.textOut(item["medida"])
-            c.drawText(text)
-
-            text = c.beginText(55, y - 38)
-            text.setFont("Helvetica-Bold", 12)
-            text.textOut("VIDRO: ")
-            text.setFont("Helvetica", 12)
-            text.textOut(item["vidro"])
-            c.drawText(text)
-
-            text = c.beginText(55, y - 55)
-            text.setFont("Helvetica-Bold", 12)
-            text.textOut("VALOR UNIT: ")
-            text.setFont("Helvetica", 12)
-            text.textOut(f"R$ {fmt_money_br(unitario)}")
-            c.drawText(text)
-
-            if item["local"].strip():
-                text = c.beginText(440, y)
-                text.setFont("Helvetica-Bold", 12)
-                text.textOut("LOCAL: ")
-                text.setFont("Helvetica", 12)
-                text.textOut(item["local"])
+                text = c.beginText(55, y)
+                text.textOut(item["nome"])
                 c.drawText(text)
 
-            text = c.beginText(300, y - 55)
-            text.setFont("Helvetica-Bold", 13)
-            text.textOut(f"TOTAL: R$ {fmt_money_br(total)}")
-            c.drawText(text)
+                text = c.beginText(55, y - 20)
+                text.setFont("Helvetica-Bold", 12)
+                text.textOut("COR: ")
+                text.setFont("Helvetica", 12)
+                text.textOut(item["cor"])
+                c.drawText(text)
 
-            text = c.beginText(0, y - 70)
-            text.setFont("Helvetica", 11)
-            text.textOut("." * 250)
-            c.drawText(text)
+                text = c.beginText(205, y - 20)
+                text.setFont("Helvetica-Bold", 12)
+                text.textOut("MEDIDA: ")
+                text.setFont("Helvetica", 12)
+                text.textOut(item["medida"])
+                c.drawText(text)
 
-            cursor.execute(
-                "SELECT imagem FROM produto WHERE id = ?",
-                (item["id_produto"],)
-            )
-            img = cursor.fetchone()[0]
+                text = c.beginText(55, y - 38)
+                text.setFont("Helvetica-Bold", 12)
+                text.textOut("MATERIAL: ")
+                text.setFont("Helvetica", 12)
+                text.textOut(item["vidro"])
+                c.drawText(text)
 
-            imagem = ImageReader(io.BytesIO(img))
-            c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+                text = c.beginText(55, y - 55)
+                text.setFont("Helvetica-Bold", 12)
+                text.textOut("VALOR UNIT: ")
+                text.setFont("Helvetica", 12)
+                text.textOut(f"R$ {fmt_money_br(unitario)}")
+                c.drawText(text)
 
-            y -= 85
-            if y < 80:
-                c.showPage()
-                y = 800
+                if item["local"].strip():
+                    text = c.beginText(440, y)
+                    text.setFont("Helvetica-Bold", 12)
+                    text.textOut("LOCAL: ")
+                    text.setFont("Helvetica", 12)
+                    text.textOut(item["local"])
+                    c.drawText(text)
 
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(35, y - 5, f"TOTAL DE ITENS: {quantidade_total}")
+                text = c.beginText(300, y - 55)
+                text.setFont("Helvetica-Bold", 13)
+                text.textOut(f"TOTAL: R$ {fmt_money_br(total)}")
+                c.drawText(text)
 
-    c.setFont("Helvetica-Bold", 15)
-    c.drawString(
-        35, y - 30,
-        f"TOTAL DO ORÇAMENTO: R$ {fmt_money_br(valor_total_orcamento)}")
+                text = c.beginText(0, y - 70)
+                text.setFont("Helvetica", 11)
+                text.textOut("." * 250)
+                c.drawText(text)
 
-    c.setFont("Helvetica-Bold", 13)
-    c.drawString(20, y - 60, negociado)
-    
-    c.setFont("Times-Bold", 12)
-    c.drawString(21, y - 85, "Condição de pagamento: ")
-    
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(200, y - 85, f"Entrada: R$ {entrada}")
+                cursor.execute(
+                    "SELECT imagem FROM produto WHERE id = %s",
+                    (item["id_produto"],)
+                )
+                img = cursor.fetchone()[0]
 
-    # TEXTO LIVRE (multilinha com quebra de página automática)
-    text = c.beginText(200, y - 100)
-    text.setFont("Helvetica-Bold", 11)
+                imagem = ImageReader(io.BytesIO(img))
+                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
 
-    y_min = 20  # limite inferior da página (ajuste se quiser)
+                y -= 85
+                if y < 80:
+                    c.showPage()
+                    y = 800
+                    
+            else:
+                text = c.beginText(30, y)
+                text.textOut(str(item["quantidade"]))
+                c.drawText(text)
 
-    for linha in condicoes.splitlines():
+                text = c.beginText(55, y)
+                text.textOut(item["nome"])
+                c.drawText(text)
 
-        # Se não couber mais na página
-        if text.getY() <= y_min:
-            c.drawText(text)
-            c.showPage()
+                text = c.beginText(55, y - 20)
+                text.setFont("Helvetica-Bold", 12)
+                text.textOut("COR: ")
+                text.setFont("Helvetica", 12)
+                text.textOut(item["cor"])
+                c.drawText(text)
 
-            # reinicia o texto na nova página
-            text = c.beginText(200, 795)
-            text.setFont("Helvetica-Bold", 11)
+                text = c.beginText(205, y - 20)
+                text.setFont("Helvetica-Bold", 12)
+                text.textOut("MEDIDA: ")
+                text.setFont("Helvetica", 12)
+                text.textOut(item["medida"])
+                c.drawText(text)
 
-        text.textLine(linha)
+                text = c.beginText(55, y - 38)
+                text.setFont("Helvetica-Bold", 12)
+                text.textOut("VIDRO: ")
+                text.setFont("Helvetica", 12)
+                text.textOut(item["vidro"])
+                c.drawText(text)
 
-    c.drawText(text)
+                text = c.beginText(55, y - 55)
+                text.setFont("Helvetica-Bold", 12)
+                text.textOut("VALOR UNIT: ")
+                text.setFont("Helvetica", 12)
+                text.textOut(f"R$ {fmt_money_br(unitario)}")
+                c.drawText(text)
 
-    # AJUSTE DINÂMICO DO Y FINAL
-    y = text.getY() - 10
+                if item["local"].strip():
+                    text = c.beginText(440, y)
+                    text.setFont("Helvetica-Bold", 12)
+                    text.textOut("LOCAL: ")
+                    text.setFont("Helvetica", 12)
+                    text.textOut(item["local"])
+                    c.drawText(text)
 
-    if y < 80:
-        c.showPage()
-        y = 900
+                text = c.beginText(300, y - 55)
+                text.setFont("Helvetica-Bold", 13)
+                text.textOut(f"TOTAL: R$ {fmt_money_br(total)}")
+                c.drawText(text)
 
-    c.setFont("Times-Bold", 11)
-    c.drawString(20, y, "Prazo de entrega: ")
-    
-    c.setFont("Helvetica", 10)
-    c.drawString(105, y, f"{prazo} a contar da data da medição oficial dos itens relacionados no pedido")
-    
-    c.setFont("Times-Bold", 12)
-    c.drawString(21, y-28, "Considerações Gerais:")
-    y -= 18
-    
-    # precisamos de ~60px de espaço para esse bloco
-    c.setFont("Times-Roman", 11)
+                text = c.beginText(0, y - 70)
+                text.setFont("Helvetica", 11)
+                text.textOut("." * 250)
+                c.drawText(text)
 
-    y -= 30
+                cursor.execute(
+                    "SELECT imagem FROM produto WHERE id = %s",
+                    (item["id_produto"],)
+                )
+                img = cursor.fetchone()[0]
 
-    linhas = [
-        "- Garantia de colocação até um (01) ano após a instalação (não cobre quebra de vidros ou mau uso);",
-        "- Horário de instalação de segunda à sexta-feira das 07h às 17h. Para colocação aos sábados ou fora deste horário, ",
-        "somente mediante consulta;",
-        "- O cliente deverá demarcar a posição do encanamento nos banheiros, lavação, cozinha, ou em qualquer outro ambiente,",
-        "onde possa passar algum cano de água, eletroduto ou tubulação de gás – sendo que a Testo Vidros não se responsabiliza em ",
-        "casos de furação dos mesmos;",
-        "- Para a medição oficial, caso haja a intenção de aplicar massa corrida, esta deverá estar aplicada antes da medição;",
-        "- Para a colocação, o vão deverá estar com o reboco seco pelo menos 48 horas e com pelo menos uma de mão de tinta aplicada;",
-        "- As aberturas deverão estar perfeitamente requadradas (esquadro), caso contrário a qualidade de colocação poderá ficar ",
-        "prejudicada;",
-        "- Nos casos em que o cliente vai abrir vão ou retirar janelas velhas para colocação de janelas em vidro temperado novas, deverá",
-        "ser combinada a data de colocação de vidros com vinte (20 dias) de antecedência;",
-        "- Este pedido não comtempla ART (Assinatura e Responsabilidade Técnica) em nenhum dos itens. Se necessária por exigência ",
-        "dos bombeiros, será cobrada a parte;",
-        "- Após a medição definitiva, os vidros deverão ser instalados em até 60 dias. Após esse período a Testo Vidros não se ",
-        "responsabiliza por eventuais danos causados ao vidro devido ao tempo de estocagem.",
-        "Assinado este, aceito e declaro estar de acordo com os itens acima descritos."
+                imagem = ImageReader(io.BytesIO(img))
+                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+
+                y -= 85
+                if y < 80:
+                    c.showPage()
+                    y = 800
+
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(35, y - 5, f"TOTAL DE ITENS: {quantidade_total}")
+
+        c.setFont("Helvetica-Bold", 15)
+        c.drawString(
+            35, y - 30,
+            f"TOTAL DO ORÇAMENTO: R$ {fmt_money_br(valor_total_orcamento)}")
+
+        c.setFont("Helvetica-Bold", 13)
+        c.drawString(20, y - 60, negociado)
         
-        ]
+        c.setFont("Times-Bold", 12)
+        c.drawString(21, y - 85, "Condição de pagamento: ")
+        
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(200, y - 85, f"Entrada: R$ {entrada}")
 
-    for linha in linhas:
-        # se essa linha não couber, quebra a página
-        if y < 20:
-            c.showPage()
-            y = 810
-            c.setFont("Times-Roman", 11)
+        # TEXTO LIVRE (multilinha com quebra de página automática)
+        text = c.beginText(200, y - 100)
+        text.setFont("Helvetica-Bold", 11)
 
-        c.drawString(20, y, linha)
-        y -= 15
+        y_min = 20  # limite inferior da página (ajuste se quiser)
 
-    c.setFont("Helvetica", 11)
-    c.drawString(48, y-70, "______________________________")
-    
-    c.drawImage("static/luan.png", 330, y-68, width=100, height=35)
-    
-    c.setFont("Helvetica", 11)
-    c.drawString(300, y-70, "______________________________")
-    c.drawString(303, y-85, "Testo Vidros 30.910.991/0001-11")
+        for linha in condicoes.splitlines():
 
-    texto = cliente + "  CPF/CNPJ - " + cpf
-    x_inicial = 48
-    largura_max = 130  # limite máximo de X
-    altura_linha = 14
+            # Se não couber mais na página
+            if text.getY() <= y_min:
+                c.drawText(text)
+                c.showPage()
 
-    linhas = simpleSplit(texto, "Helvetica", 10, largura_max)
+                # reinicia o texto na nova página
+                text = c.beginText(200, 795)
+                text.setFont("Helvetica-Bold", 11)
 
-    for linha in linhas:
+            text.textLine(linha)
+
+        c.drawText(text)
+
+        # AJUSTE DINÂMICO DO Y FINAL
+        y = text.getY() - 10
+
         if y < 80:
             c.showPage()
             y = 900
-            c.setFont("Times-Roman", 11)
 
-        c.drawString(x_inicial, y-90, linha)
-        y -= altura_linha
+        c.setFont("Times-Bold", 11)
+        c.drawString(20, y, "Prazo de entrega: ")
         
-    c.save()
-    buffer.seek(0)
-    
-    conn.commit()
-    conn.close()
+        c.setFont("Helvetica", 10)
+        c.drawString(105, y, f"{prazo} a contar da data da medição oficial dos itens relacionados no pedido")
+        
+        c.setFont("Times-Bold", 12)
+        c.drawString(21, y-28, "Considerações Gerais:")
+        y -= 18
+        
+        # precisamos de ~60px de espaço para esse bloco
+        c.setFont("Times-Roman", 11)
 
-    return Response(
-        buffer.getvalue(),
-        mimetype="application/pdf",
-        headers={"Content-Disposition": "inline; filename=orcamento.pdf"}
-    )
+        y -= 30
+
+        linhas = [
+            "- Garantia de colocação até um (01) ano após a instalação (não cobre quebra de vidros ou mau uso);",
+            "- Horário de instalação de segunda à sexta-feira das 07h às 17h. Para colocação aos sábados ou fora deste horário, ",
+            "somente mediante consulta;",
+            "- O cliente deverá demarcar a posição do encanamento nos banheiros, lavação, cozinha, ou em qualquer outro ambiente,",
+            "onde possa passar algum cano de água, eletroduto ou tubulação de gás – sendo que a Testo Vidros não se responsabiliza em ",
+            "casos de furação dos mesmos;",
+            "- Para a medição oficial, caso haja a intenção de aplicar massa corrida, esta deverá estar aplicada antes da medição;",
+            "- Para a colocação, o vão deverá estar com o reboco seco pelo menos 48 horas e com pelo menos uma de mão de tinta aplicada;",
+            "- As aberturas deverão estar perfeitamente requadradas (esquadro), caso contrário a qualidade de colocação poderá ficar ",
+            "prejudicada;",
+            "- Nos casos em que o cliente vai abrir vão ou retirar janelas velhas para colocação de janelas em vidro temperado novas, deverá",
+            "ser combinada a data de colocação de vidros com vinte (20 dias) de antecedência;",
+            "- Este pedido não comtempla ART (Assinatura e Responsabilidade Técnica) em nenhum dos itens. Se necessária por exigência ",
+            "dos bombeiros, será cobrada a parte;",
+            "- Após a medição definitiva, os vidros deverão ser instalados em até 60 dias. Após esse período a Testo Vidros não se ",
+            "responsabiliza por eventuais danos causados ao vidro devido ao tempo de estocagem.",
+            "Assinado este, aceito e declaro estar de acordo com os itens acima descritos."
+            
+            ]
+
+        for linha in linhas:
+            # se essa linha não couber, quebra a página
+            if y < 20:
+                c.showPage()
+                y = 810
+                c.setFont("Times-Roman", 11)
+
+            c.drawString(20, y, linha)
+            y -= 15
+
+        c.setFont("Helvetica", 11)
+        c.drawString(48, y-70, "______________________________")
+        
+        c.drawImage("static/luan.png", 330, y-68, width=100, height=35)
+        
+        c.setFont("Helvetica", 11)
+        c.drawString(300, y-70, "______________________________")
+        c.drawString(303, y-85, "Testo Vidros 30.910.991/0001-11")
+
+        texto = cliente + "  CPF/CNPJ - " + cpf
+        x_inicial = 48
+        largura_max = 130  # limite máximo de X
+        altura_linha = 14
+
+        linhas = simpleSplit(texto, "Helvetica", 10, largura_max)
+
+        for linha in linhas:
+            if y < 80:
+                c.showPage()
+                y = 900
+                c.setFont("Times-Roman", 11)
+
+            c.drawString(x_inicial, y-90, linha)
+            y -= altura_linha
+            
+        c.save()
+        buffer.seek(0)
+        
+        conn.commit()
+        conn.close()
+
+        return Response(
+            buffer.getvalue(),
+            mimetype="application/pdf",
+            headers={"Content-Disposition": "inline; filename=orcamento.pdf"}
+        )
     
         
 if __name__ == "__main__":
