@@ -193,6 +193,8 @@ def atualizar_prod(id):
 def cadastrar_orc():
     with get_connection() as conn:
         cursor = conn.cursor()
+        
+        session.clear()
 
         cursor.execute("SELECT id, nome FROM produto")
         produtos = cursor.fetchall()
@@ -539,10 +541,6 @@ def atualizar_orcamento(id_orcamento):
 
     with get_connection() as conn:
         cursor = conn.cursor()
-        
-        print("===== DEBUG FORM =====")
-        print(request.form)
-        print("======================")
 
         cliente = request.form.get("cliente")
         cidade = request.form.get("cidade")
@@ -602,10 +600,6 @@ def atualizar_orcamento(id_orcamento):
                 continue
 
             item_referencia = referencias[i]
-            
-            print("---- TESTE INSERÇÃO ----")
-            print("ID_ORCAMENTO:", id_orcamento)
-            print("ITEM_REFERENCIA RECEBIDO:", item_referencia)
 
             marcado = 1 if str(i) in novo_nao_incluso_lista else 0
 
@@ -628,8 +622,7 @@ def atualizar_orcamento(id_orcamento):
                 """, (item_referencia, id_orcamento))
 
                 resultado = cursor.fetchone()
-                
-                print("RESULTADO SELECT:", resultado)
+        
 
                 if resultado and resultado["ordem"] is not None:
 
