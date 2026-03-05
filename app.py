@@ -20,7 +20,6 @@ def get_connection():
 minha_cor = Color(0.7, 0.1, 0.2) 
 
 def init_db():
-
     with get_connection() as conn:
         cursor = conn.cursor()
 
