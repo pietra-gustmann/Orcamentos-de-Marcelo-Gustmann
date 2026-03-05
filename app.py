@@ -27,7 +27,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS produto (
             id TEXT PRIMARY KEY,
             nome TEXT NOT NULL,
-            imagem BLOB
+            imagem BYTEA
         );
         """)
 
