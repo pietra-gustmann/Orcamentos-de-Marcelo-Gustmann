@@ -201,8 +201,6 @@ def atualizar_prod(id):
 def cadastrar_orc():
     with get_connection() as conn:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        
-        session.clear()
 
         cursor.execute("SELECT id, nome FROM produto")
         produtos = cursor.fetchall()
