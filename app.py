@@ -67,14 +67,15 @@ def fmt_money_br(valor):
     return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 def normalizar_ordem(id_orcamento, cursor):
-    cursor.execute("""
-        SELECT id FROM item_orcamento WHERE id_orcamento = %s ORDER BY ordem, id """, (id_orcamento,))
+
+    cursor.execute("""SELECT id FROM item_orcamento WHERE id_orcamento = %s ORDER BY ordem, id""", (id_orcamento,))
 
     itens = cursor.fetchall()
 
     nova_ordem = 1
+
     for item in itens:
-        cursor.execute("""UPDATE item_orcamento SET ordem = %s WHERE id = %s""", (nova_ordem, item["id"]))
+        cursor.execute("UPDATE item_orcamento SET ordem = %s WHERE id = %s",(nova_ordem, item[0]))
         nova_ordem += 1
     
 @app.route('/')
