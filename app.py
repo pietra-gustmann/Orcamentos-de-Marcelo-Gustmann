@@ -394,7 +394,6 @@ def atualizar_orcamento(id_orcamento):
     unitarios = request.form.getlist("unitario[]")
     locais = request.form.getlist("local[]")
     nao_inclusos = request.form.getlist("nao_incluso[]")
-
     novos_produtos = request.form.getlist("novo_id_produto[]")
     novos_quantidades = request.form.getlist("novo_quantidade[]")
     novos_cores = request.form.getlist("novo_cor[]")
@@ -403,18 +402,20 @@ def atualizar_orcamento(id_orcamento):
     novos_unitarios = request.form.getlist("novo_unitario[]")
     novos_locais = request.form.getlist("novo_local[]")
     novos_nao_inclusos = request.form.getlist("novo_nao_incluso[]")
+    inserir_depois_ids = request.form.getlist("inserir_depois_id[]")
 
     with get_connection() as conn:
         cursor = conn.cursor()
-        
+
         cursor.execute(""" UPDATE orcamento SET cliente=%s, cidade=%s WHERE id_orcamento=%s """, (cliente, cidade, id_orcamento))
 
+        # atualizar itens existentes
         for i in range(len(item_ids)):
             item_id = item_ids[i]
             nao_incluso = 1 if item_id in nao_inclusos else 0
 
-            cursor.execute("""UPDATE item_orcamento SET quantidade=%s, cor=%s, medida=%s, vidro=%s, unitario=%s, local=%s, nao_incluso=%s
-                WHERE id=%s """, (
+            cursor.execute("""UPDATE item_orcamento SET quantidade=%s, cor=%s, medida=%s, vidro=%s, unitario=%s, local=%s, nao_incluso=%s WHERE id=%s
+            """, (
                 quantidades[i],
                 cores[i],
                 medidas[i],
@@ -422,17 +423,33 @@ def atualizar_orcamento(id_orcamento):
                 unitarios[i],
                 locais[i],
                 nao_incluso,
-                item_id))
+                item_id ))
 
         for i in range(len(novos_produtos)):
-
             if not novos_produtos[i]:
                 continue
 
-            nao_incluso = 1 if i < len(novos_nao_inclusos) else 0
+            nao_incluso = 1 if str(i) in novos_nao_inclusos else 0
+            inserir_depois = inserir_depois_ids[i] if i < len(inserir_depois_ids) else None
 
-            cursor.execute("""INSERT INTO item_orcamento (id_orcamento, id_produto, quantidade, cor, medida, vidro, unitario, local, nao_incluso)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (
+            if inserir_depois:
+
+                cursor.execute("""SELECT ordem FROM item_orcamento WHERE id=%s AND id_orcamento=%s""", (inserir_depois, id_orcamento))
+                ref = cursor.fetchone()
+
+                if ref:
+                    ordem_ref = ref[0]
+                    cursor.execute("""UPDATE item_orcamento  SET ordem = ordem + 1  WHERE id_orcamento=%s AND ordem > %s """, (id_orcamento, ordem_ref))
+                    nova_ordem = ordem_ref + 1
+                    
+                else:
+                    nova_ordem = 9999
+                    
+            else:
+                nova_ordem = 9999
+
+            cursor.execute("""INSERT INTO item_orcamento (id_orcamento, id_produto, quantidade, cor, medida, vidro, unitario, local, nao_incluso, ordem)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) """, (
                 id_orcamento,
                 novos_produtos[i],
                 novos_quantidades[i],
@@ -441,7 +458,8 @@ def atualizar_orcamento(id_orcamento):
                 novos_vidros[i],
                 novos_unitarios[i],
                 novos_locais[i],
-                nao_incluso))
+                nao_incluso,
+                nova_ordem))
 
         conn.commit()
 
