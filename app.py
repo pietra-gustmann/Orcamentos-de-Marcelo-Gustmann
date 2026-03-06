@@ -201,6 +201,8 @@ def atualizar_prod(id):
 def cadastrar_orc():
     with get_connection() as conn:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        session.clear()
 
         cursor.execute("SELECT id, nome FROM produto")
         produtos = cursor.fetchall()
@@ -361,8 +363,10 @@ def cadastrar_orc():
                             if item["local"]:
                                 c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                            imagem = ImageReader(item["imagem"])
-                            c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+                            if item["imagem"]:
+                                imagem_bytes = bytes(item["imagem"])
+                                imagem = ImageReader(imagem_bytes)
+                                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                             
                             y -= 85
                             if y < 80:
@@ -383,7 +387,12 @@ def cadastrar_orc():
                             if item["local"]:
                                 c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                            imagem = ImageReader(item["imagem"])
+                            if item["imagem"]:
+                                imagem_bytes = bytes(item["imagem"])
+                                imagem = ImageReader(imagem_bytes)
+                                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+                                
+                                
                             c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                             
                             c.setFillColor(minha_cor)
@@ -414,9 +423,11 @@ def cadastrar_orc():
 
                             if item["local"]:
                                 c.drawString(440, y, f"LOCAL: {item['local']}")
-
-                            imagem = ImageReader(item["imagem"])
-                            c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+                            
+                            if item["imagem"]:
+                                imagem_bytes = bytes(item["imagem"])
+                                imagem = ImageReader(imagem_bytes)
+                                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                             
                             y -= 85
                             if y < 80:
@@ -437,8 +448,10 @@ def cadastrar_orc():
                             if item["local"]:
                                 c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                            imagem = ImageReader(item["imagem"])
-                            c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+                            if item["imagem"]:
+                                imagem_bytes = bytes(item["imagem"])
+                                imagem = ImageReader(imagem_bytes)
+                                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                             
                             c.setFillColor(minha_cor)
                             c.setFont("Helvetica-Oblique", 12)
@@ -750,8 +763,10 @@ def gerar_pdf(id_orcamento):
                     if item["local"]:
                         c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                    imagem = ImageReader(item["imagem"])
-                    c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+                    if item["imagem"]:
+                                imagem_bytes = bytes(item["imagem"])
+                                imagem = ImageReader(imagem_bytes)
+                                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                     
                     y -= 85
                     if y < 80:
@@ -772,8 +787,10 @@ def gerar_pdf(id_orcamento):
                     if item["local"]:
                         c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                    imagem = ImageReader(item["imagem"])
-                    c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+                    if item["imagem"]:
+                                imagem_bytes = bytes(item["imagem"])
+                                imagem = ImageReader(imagem_bytes)
+                                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                     
                     c.setFillColor(minha_cor)
                     c.setFont("Helvetica-Oblique", 12)
@@ -804,8 +821,10 @@ def gerar_pdf(id_orcamento):
                     if item["local"]:
                         c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                    imagem = ImageReader(item["imagem"])
-                    c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+                    if item["imagem"]:
+                                imagem_bytes = bytes(item["imagem"])
+                                imagem = ImageReader(imagem_bytes)
+                                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                     
                     y -= 85
                     if y < 80:
@@ -826,8 +845,10 @@ def gerar_pdf(id_orcamento):
                     if item["local"]:
                         c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                    imagem = ImageReader(item["imagem"])
-                    c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+                    if item["imagem"]:
+                                imagem_bytes = bytes(item["imagem"])
+                                imagem = ImageReader(imagem_bytes)
+                                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                     
                     c.setFillColor(minha_cor)
                     c.setFont("Helvetica-Oblique", 12)
@@ -1022,8 +1043,10 @@ def gerar_pdf_completo():
                 )
                 img = cursor.fetchone()["imagem"]
 
-                imagem = ImageReader(io.BytesIO(img))
-                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+                if item["imagem"]:
+                                imagem_bytes = bytes(item["imagem"])
+                                imagem = ImageReader(imagem_bytes)
+                                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
 
                 y -= 85
                 if y < 80:
@@ -1091,8 +1114,10 @@ def gerar_pdf_completo():
                 )
                 img = cursor.fetchone()["imagem"]
 
-                imagem = ImageReader(io.BytesIO(img))
-                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
+                if item["imagem"]:
+                                imagem_bytes = bytes(item["imagem"])
+                                imagem = ImageReader(imagem_bytes)
+                                c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
 
                 y -= 85
                 if y < 80:
