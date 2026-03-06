@@ -384,33 +384,64 @@ def editar_orcamento(id_orcamento):
 @app.route("/atualizar_orcamento/<int:id_orcamento>", methods=["POST"])
 def atualizar_orcamento(id_orcamento):
 
+    cliente = request.form.get("cliente")
+    cidade = request.form.get("cidade")
+    item_ids = request.form.getlist("item_id[]")
+    quantidades = request.form.getlist("quantidade[]")
+    cores = request.form.getlist("cor[]")
+    medidas = request.form.getlist("medida[]")
+    vidros = request.form.getlist("vidro[]")
+    unitarios = request.form.getlist("unitario[]")
+    locais = request.form.getlist("local[]")
+    nao_inclusos = request.form.getlist("nao_incluso[]")
+
+    novos_produtos = request.form.getlist("novo_id_produto[]")
+    novos_quantidades = request.form.getlist("novo_quantidade[]")
+    novos_cores = request.form.getlist("novo_cor[]")
+    novos_medidas = request.form.getlist("novo_medida[]")
+    novos_vidros = request.form.getlist("novo_vidro[]")
+    novos_unitarios = request.form.getlist("novo_unitario[]")
+    novos_locais = request.form.getlist("novo_local[]")
+    novos_nao_inclusos = request.form.getlist("novo_nao_incluso[]")
+
     with get_connection() as conn:
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor = conn.cursor()
+        
+        cursor.execute(""" UPDATE orcamento SET cliente=%s, cidade=%s WHERE id_orcamento=%s """, (cliente, cidade, id_orcamento))
 
-        cliente = request.form.get("cliente", "").strip()
-        cidade = request.form.get("cidade", "").strip()
+        for i in range(len(item_ids)):
+            item_id = item_ids[i]
+            nao_incluso = 1 if item_id in nao_inclusos else 0
 
-        cursor.execute(""" UPDATE orcamento SET cliente = %s, cidade = %s WHERE id_orcamento = %s""", 
-            (cliente, cidade, id_orcamento))
+            cursor.execute("""UPDATE item_orcamento SET quantidade=%s, cor=%s, medida=%s, vidro=%s, unitario=%s, local=%s, nao_incluso=%s
+                WHERE id=%s """, (
+                quantidades[i],
+                cores[i],
+                medidas[i],
+                vidros[i],
+                unitarios[i],
+                locais[i],
+                nao_incluso,
+                item_id))
 
-        ids = request.form.getlist("item_id[]")
-        nao_incluso_lista = request.form.getlist("nao_incluso[]")
+        for i in range(len(novos_produtos)):
 
-        for i in range(len(ids)):
-            marcado = 1 if str(ids[i]) in nao_incluso_lista else 0
+            if not novos_produtos[i]:
+                continue
 
-            cursor.execute(""" UPDATE item_orcamento SET quantidade = %s, cor = %s, medida = %s, vidro = %s, 
-                    unitario = %s, local = %s, nao_incluso = %s
-                WHERE id = %s AND id_orcamento = %s """, (
-                request.form.getlist("quantidade[]")[i],
-                request.form.getlist("cor[]")[i],
-                request.form.getlist("medida[]")[i],
-                request.form.getlist("vidro[]")[i],
-                float(request.form.getlist("unitario[]")[i] or 0),
-                request.form.getlist("local[]")[i],
-                marcado,
-                ids[i],
-                id_orcamento))
+            nao_incluso = 1 if i < len(novos_nao_inclusos) else 0
+
+            cursor.execute("""INSERT INTO item_orcamento (id_orcamento, id_produto, quantidade, cor, medida, vidro, unitario, local, nao_incluso)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (
+                id_orcamento,
+                novos_produtos[i],
+                novos_quantidades[i],
+                novos_cores[i],
+                novos_medidas[i],
+                novos_vidros[i],
+                novos_unitarios[i],
+                novos_locais[i],
+                nao_incluso))
 
         conn.commit()
 
