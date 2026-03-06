@@ -67,17 +67,15 @@ def fmt_money_br(valor):
     return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 def normalizar_ordem(id_orcamento, cursor):
-    with get_connection() as conn:
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        cursor.execute("""
-            SELECT id FROM item_orcamento WHERE id_orcamento = %s ORDER BY ordem, id """, (id_orcamento,))
+    cursor.execute("""
+        SELECT id FROM item_orcamento WHERE id_orcamento = %s ORDER BY ordem, id """, (id_orcamento,))
 
-        itens = cursor.fetchall()
+    itens = cursor.fetchall()
 
-        nova_ordem = 1
-        for item in itens:
-            cursor.execute("""UPDATE item_orcamento SET ordem = %s WHERE id = %s""", (nova_ordem, item["id"]))
-            nova_ordem += 1
+    nova_ordem = 1
+    for item in itens:
+        cursor.execute("""UPDATE item_orcamento SET ordem = %s WHERE id = %s""", (nova_ordem, item["id"]))
+        nova_ordem += 1
     
 @app.route('/')
 def home():
@@ -426,30 +424,51 @@ def atualizar_orcamento(id_orcamento):
                 item_id ))
 
         for i in range(len(novos_produtos)):
+
             if not novos_produtos[i]:
                 continue
 
             nao_incluso = 1 if str(i) in novos_nao_inclusos else 0
-            inserir_depois = inserir_depois_ids[i] if i < len(inserir_depois_ids) else None
 
-            if inserir_depois:
+            inserir_depois = None
+            if i < len(inserir_depois_ids):
+                inserir_depois = inserir_depois_ids[i]
 
-                cursor.execute("""SELECT ordem FROM item_orcamento WHERE id=%s AND id_orcamento=%s""", (inserir_depois, id_orcamento))
+            if inserir_depois and inserir_depois.strip() != "":
+
+                cursor.execute("""
+                    SELECT ordem FROM item_orcamento
+                    WHERE id = %s AND id_orcamento = %s
+                """, (inserir_depois, id_orcamento))
+
                 ref = cursor.fetchone()
 
                 if ref:
                     ordem_ref = ref[0]
-                    cursor.execute("""UPDATE item_orcamento  SET ordem = ordem + 1  WHERE id_orcamento=%s AND ordem > %s """, (id_orcamento, ordem_ref))
+
+                    cursor.execute("""
+                        UPDATE item_orcamento
+                        SET ordem = ordem + 1
+                        WHERE id_orcamento = %s AND ordem > %s
+                    """, (id_orcamento, ordem_ref))
+
                     nova_ordem = ordem_ref + 1
-                    
                 else:
                     nova_ordem = 9999
-                    
-            else:
-                nova_ordem = 9999
 
-            cursor.execute("""INSERT INTO item_orcamento (id_orcamento, id_produto, quantidade, cor, medida, vidro, unitario, local, nao_incluso, ordem)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) """, (
+            else:
+                cursor.execute("""
+                    SELECT COALESCE(MAX(ordem),0)+1
+                    FROM item_orcamento
+                    WHERE id_orcamento=%s
+                """, (id_orcamento,))
+                nova_ordem = cursor.fetchone()[0]
+
+            cursor.execute("""
+                INSERT INTO item_orcamento
+                (id_orcamento, id_produto, quantidade, cor, medida, vidro, unitario, local, nao_incluso, ordem)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (
                 id_orcamento,
                 novos_produtos[i],
                 novos_quantidades[i],
@@ -459,9 +478,11 @@ def atualizar_orcamento(id_orcamento):
                 novos_unitarios[i],
                 novos_locais[i],
                 nao_incluso,
-                nova_ordem))
+                nova_ordem
+            ))
 
         conn.commit()
+        normalizar_ordem(id_orcamento, cursor)
 
     return redirect(url_for("editar_orcamento", id_orcamento=id_orcamento))
 
