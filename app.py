@@ -44,22 +44,21 @@ def init_db():
             id SERIAL PRIMARY KEY,
             id_orcamento INTEGER,
             id_produto TEXT,
-            nao_incluso INTEGER DEFAULT 0,
+            nao_incluso BOOLEAN DEFAULT FALSE,
             quantidade INTEGER,
             cor TEXT,
             medida TEXT,
             vidro TEXT,
-            unitario REAL,
+            unitario NUMERIC(10,2),
             local TEXT,
             ordem INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY(id_orcamento) REFERENCES orcamento(id_orcamento) ON DELETE CASCADE,
             FOREIGN KEY(id_produto) REFERENCES produto(id) ON UPDATE CASCADE
         );
         """)
+   
+init_db()
 
-    conn.commit()
-    conn.close()
-    
 def fmt_money_br(valor):
     return f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
@@ -81,8 +80,7 @@ def normalizar_ordem(id_orcamento, cursor):
             WHERE id = %s
         """, (nova_ordem, item["id"]))
         nova_ordem += 1
-    
-init_db()
+  
     
 @app.route('/')
 def home():
@@ -116,25 +114,32 @@ def imagem(id):
         cursor.execute("SELECT imagem FROM produto WHERE id = %s", (id,))
         img = cursor.fetchone()
 
-        if img:
-            return Response(img[0], mimetype='image/jpeg')
+        if img and img["imagem"]:
+            return Response(img["imagem"], mimetype='image/jpeg')
 
         return '', 404
 
-@app.route("/cadastro_novo_prod", methods=['GET' , 'POST'])
+@app.route("/cadastro_novo_prod", methods=['GET', 'POST'])
 def cadastro_novo_prod():
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        
-        if request.method == 'POST':
-            id = request.form['id']
-            nome = request.form['nome']
-            
-            imagem = request.files['imagem']
-            imagem = imagem.read()
-            
-            cursor.execute("""INSERT INTO produto (id, nome, imagem)
-                VALUES (%s,%s,%s) """, (id, nome, imagem))
+
+    if request.method == 'POST':
+
+        codigo = request.form['id']
+        nome = request.form['nome']
+
+        imagem_file = request.files.get('imagem')
+        imagem_bytes = None
+
+        if imagem_file and imagem_file.filename != "":
+            imagem_bytes = imagem_file.read()
+
+        with get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO produto (id, nome, imagem)
+                VALUES (%s, %s, %s)
+            """, (codigo, nome, imagem_bytes))
 
             conn.commit()
 
@@ -173,9 +178,9 @@ def atualizar_prod(id):
 
             cursor.execute("""
                 UPDATE produto
-                SET id = %s, nome = %s, imagem = %s
+                SET nome = %s, imagem = %s
                 WHERE id = %s
-            """, (novo_id, novo_nome, imagem_bytes, id))
+            """, (novo_nome, imagem_bytes, id))
 
         else:
             # 🔹 Se NÃO enviou imagem → mantém a antiga
@@ -193,8 +198,6 @@ def atualizar_prod(id):
 def cadastrar_orc():
     with get_connection() as conn:
         cursor = conn.cursor()
-        
-        session.clear()
 
         cursor.execute("SELECT id, nome FROM produto")
         produtos = cursor.fetchall()
@@ -213,9 +216,10 @@ def cadastrar_orc():
                 cursor.execute("""
                     INSERT INTO orcamento (cliente, cidade)
                     VALUES (%s, %s)
+                    RETURNING id
                 """, (cliente, cidade))
 
-                session["id_orcamento"] = cursor.lastrowid
+                session["id_orcamento"] = cursor.fetchone()["id"]
                 session["cliente"] = cliente
                 session["cidade"] = cidade
 
@@ -354,7 +358,7 @@ def cadastrar_orc():
                             if item["local"]:
                                 c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                            imagem = ImageReader(io.BytesIO(item["imagem"]))
+                            imagem = ImageReader(item["imagem"])
                             c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                             
                             y -= 85
@@ -376,7 +380,7 @@ def cadastrar_orc():
                             if item["local"]:
                                 c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                            imagem = ImageReader(io.BytesIO(item["imagem"]))
+                            imagem = ImageReader(item["imagem"])
                             c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                             
                             c.setFillColor(minha_cor)
@@ -408,7 +412,7 @@ def cadastrar_orc():
                             if item["local"]:
                                 c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                            imagem = ImageReader(io.BytesIO(item["imagem"]))
+                            imagem = ImageReader(item["imagem"])
                             c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                             
                             y -= 85
@@ -430,7 +434,7 @@ def cadastrar_orc():
                             if item["local"]:
                                 c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                            imagem = ImageReader(io.BytesIO(item["imagem"]))
+                            imagem = ImageReader(item["imagem"])
                             c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                             
                             c.setFillColor(minha_cor)
@@ -481,7 +485,7 @@ def excluir_orcamento(id_orcamento):
         cursor.execute("DELETE FROM orcamento WHERE id_orcamento = %s", (id_orcamento,))
         conn.commit()
 
-    return redirect("/orc_cadastrados")
+    return redirect(url_for("orc_cadastrados"))
 
 @app.route("/excluir_item_orcamento/<int:item_id>", methods=["POST"])
 def excluir_item_orcamento(item_id):
@@ -492,7 +496,6 @@ def excluir_item_orcamento(item_id):
         cursor.execute("DELETE FROM item_orcamento WHERE id = %s", (item_id,))
         
         conn.commit()
-        conn.close()
 
         return "", 200
 
@@ -672,7 +675,6 @@ def atualizar_orcamento(id_orcamento):
 
         normalizar_ordem(id_orcamento, cursor)
         conn.commit()
-        conn.close()
 
         return redirect(url_for("editar_orcamento", id_orcamento=id_orcamento))
 
@@ -745,7 +747,7 @@ def gerar_pdf(id_orcamento):
                     if item["local"]:
                         c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                    imagem = ImageReader(io.BytesIO(item["imagem"]))
+                    imagem = ImageReader(item["imagem"])
                     c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                     
                     y -= 85
@@ -767,7 +769,7 @@ def gerar_pdf(id_orcamento):
                     if item["local"]:
                         c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                    imagem = ImageReader(io.BytesIO(item["imagem"]))
+                    imagem = ImageReader(item["imagem"])
                     c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                     
                     c.setFillColor(minha_cor)
@@ -799,7 +801,7 @@ def gerar_pdf(id_orcamento):
                     if item["local"]:
                         c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                    imagem = ImageReader(io.BytesIO(item["imagem"]))
+                    imagem = ImageReader(item["imagem"])
                     c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                     
                     y -= 85
@@ -821,7 +823,7 @@ def gerar_pdf(id_orcamento):
                     if item["local"]:
                         c.drawString(440, y, f"LOCAL: {item['local']}")
 
-                    imagem = ImageReader(io.BytesIO(item["imagem"]))
+                    imagem = ImageReader(item["imagem"])
                     c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
                     
                     c.setFillColor(minha_cor)
@@ -1015,7 +1017,7 @@ def gerar_pdf_completo():
                     "SELECT imagem FROM produto WHERE id = %s",
                     (item["id_produto"],)
                 )
-                img = cursor.fetchone()[0]
+                img = cursor.fetchone()["imagem"]
 
                 imagem = ImageReader(io.BytesIO(img))
                 c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
@@ -1084,7 +1086,7 @@ def gerar_pdf_completo():
                     "SELECT imagem FROM produto WHERE id = %s",
                     (item["id_produto"],)
                 )
-                img = cursor.fetchone()[0]
+                img = cursor.fetchone()["imagem"]
 
                 imagem = ImageReader(io.BytesIO(img))
                 c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
@@ -1212,9 +1214,6 @@ def gerar_pdf_completo():
             
         c.save()
         buffer.seek(0)
-        
-        conn.commit()
-        conn.close()
 
         return Response(
             buffer.getvalue(),
@@ -1222,6 +1221,5 @@ def gerar_pdf_completo():
             headers={"Content-Disposition": "inline; filename=orcamento.pdf"}
         )
     
-        
 if __name__ == "__main__":
     app.run(debug=True) 
