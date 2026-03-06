@@ -216,10 +216,10 @@ def cadastrar_orc():
                 cursor.execute("""
                     INSERT INTO orcamento (cliente, cidade)
                     VALUES (%s, %s)
-                    RETURNING id
+                    RETURNING id_orcamento
                 """, (cliente, cidade))
 
-                session["id_orcamento"] = cursor.fetchone()["id"]
+                session["id_orcamento"] = cursor.fetchone()["id_orcamento"]
                 session["cliente"] = cliente
                 session["cidade"] = cidade
 
