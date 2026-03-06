@@ -8,6 +8,8 @@ from reportlab.lib import colors
 from reportlab.lib.colors import Color
 import psycopg2
 import psycopg2.extras
+from psycopg2.extras import RealDictCursor
+
 
 DATABASE_URL = os.environ.get("DATABASE_URL") 
 
@@ -15,13 +17,14 @@ app = Flask(__name__)
 app.secret_key = "Trabalhoooooooooooooooooooooo"
 
 def get_connection():
-    return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    conn = psycopg2.connect(DATABASE_URL)
+    return conn
 
 minha_cor = Color(0.7, 0.1, 0.2) 
 
 def init_db():
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS produto (
@@ -89,7 +92,7 @@ def home():
 @app.route('/prod_cadastrados')
 def prod_cadastrados():
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute("SELECT * FROM produto")
         produtos = cursor.fetchall()
@@ -99,7 +102,7 @@ def prod_cadastrados():
 @app.route("/excluir_produto/<id>", methods=["POST"])
 def excluir_produto(id):
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute("DELETE FROM produto WHERE id = %s", (id,))
         conn.commit()
@@ -109,7 +112,7 @@ def excluir_produto(id):
 @app.route('/imagem/<id>')
 def imagem(id):
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute("SELECT imagem FROM produto WHERE id = %s", (id,))
         img = cursor.fetchone()
@@ -134,7 +137,7 @@ def cadastro_novo_prod():
             imagem_bytes = imagem_file.read()
 
         with get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
             cursor.execute("""
                 INSERT INTO produto (id, nome, imagem)
@@ -148,7 +151,7 @@ def cadastro_novo_prod():
 @app.route("/editar_prod/<id>")
 def editar_prod(id):
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         # orçamento
         cursor.execute(
@@ -170,7 +173,7 @@ def atualizar_prod(id):
     nova_imagem = request.files.get("imagem")
 
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         # 🔹 Se enviou nova imagem
         if nova_imagem and nova_imagem.filename != "":
@@ -197,7 +200,7 @@ def atualizar_prod(id):
 @app.route("/cadastrar_orc", methods=["GET", "POST"])
 def cadastrar_orc():
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute("SELECT id, nome FROM produto")
         produtos = cursor.fetchall()
@@ -470,7 +473,7 @@ def cadastrar_orc():
 @app.route("/orc_cadastrados") 
 def orc_cadastrados():
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute("SELECT * FROM orcamento")
         orcamentos = cursor.fetchall()
@@ -480,7 +483,7 @@ def orc_cadastrados():
 @app.route("/excluir_orcamento/<id_orcamento>", methods=["POST"])
 def excluir_orcamento(id_orcamento):
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute("DELETE FROM orcamento WHERE id_orcamento = %s", (id_orcamento,))
         conn.commit()
@@ -491,7 +494,7 @@ def excluir_orcamento(id_orcamento):
 def excluir_item_orcamento(item_id):
 
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute("DELETE FROM item_orcamento WHERE id = %s", (item_id,))
         
@@ -502,7 +505,7 @@ def excluir_item_orcamento(item_id):
 @app.route("/editar_orcamento/<int:id_orcamento>")
 def editar_orcamento(id_orcamento):
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         # 🔹 Buscar orçamento
         cursor.execute("""
@@ -543,7 +546,7 @@ def editar_orcamento(id_orcamento):
 def atualizar_orcamento(id_orcamento):
 
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cliente = request.form.get("cliente")
         cidade = request.form.get("cidade")
@@ -682,7 +685,7 @@ def atualizar_orcamento(id_orcamento):
 def gerar_pdf(id_orcamento):
 
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         # 🔹 Buscar itens
         cursor.execute("""
@@ -851,7 +854,7 @@ def gerar_pdf(id_orcamento):
 @app.route("/finalizar_orcamento/<int:id_orcamento>", methods=["GET", "POST"])
 def finalizar_orcamento(id_orcamento):
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         if request.method == "POST":
             cursor.execute("""
@@ -912,7 +915,7 @@ def finalizar_orcamento(id_orcamento):
 @app.route("/gerar_pdf_completo")
 def gerar_pdf_completo():
     with get_connection() as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cliente = session.get("cliente")
         cidade = session.get("cidade")
