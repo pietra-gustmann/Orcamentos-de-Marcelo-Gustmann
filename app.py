@@ -185,7 +185,6 @@ def cadastrar_orc():
 
         cursor.execute("SELECT id, nome FROM produto")
         produtos = cursor.fetchall()
-        session.clear()
 
         if request.method == "POST":
 
