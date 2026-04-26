@@ -819,7 +819,7 @@ def gerar_pdf_completo():
         c.drawString(21, y-28, "Considerações Gerais:")
         c.setFont("Times-Roman", 11)
 
-        y -= 30
+        y -= 45
         linhas = [
             "- Garantia de colocação até um (01) ano após a instalação (não cobre quebra de vidros ou mau uso);",
             "- Horário de instalação de segunda à sexta-feira das 07h às 17h. Para colocação aos sábados ou fora deste horário, ",
