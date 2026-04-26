@@ -207,7 +207,7 @@ def cadastrar_orc():
                 conn.commit()
 
             id_orcamento = session["id_orcamento"]
-            nao_incluso = 1 if request.form.get("nao_incluso") else 0
+            nao_incluso = True if request.form.get("nao_incluso") else False
 
             if acao in ["adicionar", "salvar"]:
 
@@ -411,7 +411,7 @@ def atualizar_orcamento(id_orcamento):
         # atualizar itens existentes
         for i in range(len(item_ids)):
             item_id = item_ids[i]
-            nao_incluso = 1 if item_id in nao_inclusos else 0
+            nao_incluso = True if item_id in nao_inclusos else False
 
             cursor.execute("""UPDATE item_orcamento SET quantidade=%s, cor=%s, medida=%s, vidro=%s, unitario=%s, local=%s, nao_incluso=%s WHERE id=%s
             """, (
@@ -429,7 +429,7 @@ def atualizar_orcamento(id_orcamento):
             if not novos_produtos[i]:
                 continue
 
-            nao_incluso = 1 if str(i) in novos_nao_inclusos else 0
+            nao_incluso = True if str(i) in novos_nao_inclusos else False
 
             inserir_depois = None
             if i < len(inserir_depois_ids):
@@ -530,7 +530,7 @@ def gerar_pdf(id_orcamento):
         unitario = float(item["unitario"])
         total = qtd * unitario
 
-        if item["nao_incluso"] == 0:
+        if not item["nao_incluso"]:
             quantidade_total += qtd
             valor_total_orcamento += total
 
@@ -551,8 +551,7 @@ def gerar_pdf(id_orcamento):
             imagem = ImageReader(io.BytesIO(imagem_bytes))
             c.drawImage(imagem, 455, y - 65, width=100, height=60, mask="auto")
 
-        if item["nao_incluso"] == 1:
-
+        if item["nao_incluso"]:
             c.setFillColor(minha_cor)
             c.setFont("Helvetica-Oblique", 12)
 
